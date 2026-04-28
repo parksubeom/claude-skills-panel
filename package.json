@@ -1,0 +1,92 @@
+{
+  "name": "claude-skills-panel",
+  "displayName": "Claude Code Skills Panel",
+  "description": "Browse and trigger Claude Code skills from a sidebar panel",
+  "version": "0.0.1",
+  "publisher": "codnut00",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/parksubeom/claude-skills-panel.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "skills",
+    "ai"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudeSkills",
+          "title": "Claude Skills",
+          "icon": "icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "claudeSkills": [
+        {
+          "id": "claudeSkillsList",
+          "name": "Skills"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeSkills.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeSkills.copyTrigger",
+        "title": "Copy /skill trigger"
+      },
+      {
+        "command": "claudeSkills.openFile",
+        "title": "Open SKILL.md"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeSkills.refresh",
+          "when": "view == claudeSkillsList",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "claudeSkills.openFile",
+          "when": "view == claudeSkillsList && viewItem == skill",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build:icon": "node scripts/build-icon.js",
+    "package": "vsce package",
+    "publish:vsce": "vsce publish",
+    "publish:ovsx": "ovsx publish",
+    "publish:all": "npm run package && vsce publish && ovsx publish"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.0",
+    "ovsx": "^0.10.0",
+    "sharp": "^0.34.5"
+  }
+}

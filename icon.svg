@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect width="24" height="24" rx="5" fill="#1e1b4b"/>
+  <!-- wand stick (diagonal from bottom-left to upper-right) -->
+  <line x1="5.2" y1="18.8" x2="14" y2="10" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+  <!-- handle accent -->
+  <line x1="5.2" y1="18.8" x2="7.5" y2="16.5" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- main star at tip -->
+  <path d="M16 5 L17.1 8.1 L20.2 9.2 L17.1 10.3 L16 13.4 L14.9 10.3 L11.8 9.2 L14.9 8.1 Z" fill="#fbbf24"/>
+  <!-- small sparkles -->
+  <path d="M20 14 L20.5 15.3 L21.8 15.8 L20.5 16.3 L20 17.6 L19.5 16.3 L18.2 15.8 L19.5 15.3 Z" fill="#f9a8d4"/>
+  <path d="M11 4.5 L11.4 5.5 L12.4 5.9 L11.4 6.3 L11 7.3 L10.6 6.3 L9.6 5.9 L10.6 5.5 Z" fill="#67e8f9"/>
+</svg>
