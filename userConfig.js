@@ -85,8 +85,8 @@ function yesterdayKey() {
   return localDateKey(d);
 }
 
-// Records a copy event. Returns { prevLevel, nextLevel, streak, totalCopies, newAchievements }.
-function recordUsage(name) {
+// Records a copy event. Returns { prevLevel, nextLevel, streak, totalCopies, newAchievements, buddy }.
+function recordUsage(name, source) {
   const cfg = read();
   if (!cfg.meta) cfg.meta = {};
   if (typeof cfg.meta.totalCopies !== 'number') cfg.meta.totalCopies = 0;
@@ -123,9 +123,31 @@ function recordUsage(name) {
     cfg.meta.streak.lastDate = today;
   }
 
+  // Buddy character growth (in same cfg snapshot)
+  if (!cfg.character) cfg.character = {};
+  const c = cfg.character;
+  if (!c.name) c.name = os.userInfo().username || 'Claude';
+  if (typeof c.actions !== 'number') c.actions = 0;
+  if (!c.stats) c.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+  const prevStage = buddyStageFor(c.actions);
+  c.actions += 1;
+  if (INT_KEYWORDS.test(name)) c.stats.int += 1;
+  c.stats.dex += source === 'quickbar' ? 2 : 1;
+  // VIT: only on streak days where this is the first action (we just bumped streak above)
+  if (cfg.meta.streak.lastDate === today && cfg.meta.streak.days > 0) {
+    // approximate: bump VIT once per day — track in last-vit-date
+    if (cfg.character.lastVitDate !== today) {
+      c.stats.vit = (c.stats.vit || 0) + 1;
+      cfg.character.lastVitDate = today;
+    }
+  }
+  const nextStage = buddyStageFor(c.actions);
+
   // Achievements (lazy require to avoid cycle)
   const achievements = require('./achievements');
   const { newly } = achievements.checkAndApply(cfg);
+  // LCK: +5 per new achievement
+  if (newly && newly.length) c.stats.lck = (c.stats.lck || 0) + newly.length * 5;
 
   write(cfg);
   return {
@@ -134,7 +156,78 @@ function recordUsage(name) {
     streak: cfg.meta.streak.days,
     totalCopies: cfg.meta.totalCopies,
     newAchievements: newly,
+    buddy: {
+      prevStage,
+      nextStage,
+      stageName: BUDDY_NAMES[nextStage],
+      character: getCharacter(),
+    },
   };
+}
+
+// Buddy character thresholds (must match build-buddy-icons.js STAGES)
+const BUDDY_THRESHOLDS = [0, 10, 30, 100, 300, 1000];
+const BUDDY_NAMES = ['Egg', 'Slime', 'Bunny', 'Cat', 'Fox', 'Dragon'];
+
+function buddyStageFor(actions) {
+  for (let i = BUDDY_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (actions >= BUDDY_THRESHOLDS[i]) return i;
+  }
+  return 0;
+}
+
+// INT growth from thinking/planning skills, DEX from quick triggers, etc.
+const INT_KEYWORDS = /(brainstorm|writing-plans|writing-skills|planning|review|debug|verif|simplif|systematic)/i;
+
+function getCharacter() {
+  const cfg = read();
+  const c = cfg.character || {};
+  if (!c.name) c.name = os.userInfo().username || 'Claude';
+  if (typeof c.actions !== 'number') c.actions = 0;
+  if (!c.stats) c.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+  c.stage = buddyStageFor(c.actions);
+  c.stageName = BUDDY_NAMES[c.stage];
+  c.nextThreshold = BUDDY_THRESHOLDS[c.stage + 1] || null;
+  c.currentThreshold = BUDDY_THRESHOLDS[c.stage];
+  return c;
+}
+
+function setCharacterName(name) {
+  const cfg = read();
+  if (!cfg.character) cfg.character = {};
+  cfg.character.name = name || os.userInfo().username || 'Claude';
+  write(cfg);
+}
+
+// Records a buddy action when a skill is used. Returns { prevStage, nextStage, character }.
+function recordBuddyAction(skillName, source) {
+  const cfg = read();
+  if (!cfg.character) cfg.character = {};
+  const c = cfg.character;
+  if (!c.name) c.name = os.userInfo().username || 'Claude';
+  if (typeof c.actions !== 'number') c.actions = 0;
+  if (!c.stats) c.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+
+  const prevStage = buddyStageFor(c.actions);
+  c.actions += 1;
+  // INT: thinking-type skills
+  if (INT_KEYWORDS.test(skillName)) c.stats.int += 1;
+  // DEX: quick-bar / fast triggers
+  if (source === 'quickbar') c.stats.dex += 2;
+  else c.stats.dex += 1;
+  // VIT: bumped daily by streak (handled separately)
+  // LCK: bumped on achievements (handled separately)
+  const nextStage = buddyStageFor(c.actions);
+  write(cfg);
+  return { prevStage, nextStage, character: getCharacter() };
+}
+
+function bumpCharacterStat(stat, amount = 1) {
+  const cfg = read();
+  if (!cfg.character) cfg.character = {};
+  if (!cfg.character.stats) cfg.character.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+  cfg.character.stats[stat] = (cfg.character.stats[stat] || 0) + amount;
+  write(cfg);
 }
 
 function getMeta() {
@@ -226,4 +319,11 @@ module.exports = {
   setQuickbar,
   levelFor,
   LEVEL_THRESHOLDS,
+  getCharacter,
+  setCharacterName,
+  recordBuddyAction,
+  bumpCharacterStat,
+  buddyStageFor,
+  BUDDY_THRESHOLDS,
+  BUDDY_NAMES,
 };

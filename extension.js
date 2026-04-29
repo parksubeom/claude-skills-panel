@@ -6,6 +6,87 @@ const { pickIcon } = require('./iconMap');
 const userConfig = require('./userConfig');
 const achievements = require('./achievements');
 
+// OS-level paste keystroke. Cmd+V (macOS) / Ctrl+V (Windows / Linux).
+// Optionally follows with Enter for fully autonomous send.
+//   - macOS: uses osascript (System Events)   → needs Accessibility permission
+//   - Windows: uses PowerShell SendKeys       → no permission prompt
+//   - Linux: uses xdotool if available        → must install xdotool
+function osKeystroke(withEnter) {
+  const cp = require('child_process');
+  if (process.platform === 'darwin') {
+    const script = withEnter
+      ? `tell application "System Events" to keystroke "v" using command down
+         delay 0.06
+         tell application "System Events" to keystroke return`
+      : `tell application "System Events" to keystroke "v" using command down`;
+    try {
+      cp.execFile('osascript', ['-e', script], { timeout: 2000 }, () => {});
+      return true;
+    } catch { return false; }
+  }
+  if (process.platform === 'win32') {
+    const cmd = withEnter
+      ? "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v'); Start-Sleep -Milliseconds 60; [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')"
+      : "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')";
+    try {
+      cp.execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', cmd], { timeout: 3000 }, () => {});
+      return true;
+    } catch { return false; }
+  }
+  if (process.platform === 'linux') {
+    // xdotool: not preinstalled on most distros — installs via apt/dnf/pacman
+    try {
+      cp.execFile('xdotool', ['key', 'ctrl+v'], { timeout: 1500 }, () => {});
+      if (withEnter) {
+        setTimeout(() => {
+          try { cp.execFile('xdotool', ['key', 'Return'], { timeout: 1500 }, () => {}); } catch {}
+        }, 60);
+      }
+      return true;
+    } catch { return false; }
+  }
+  return false;
+}
+
+async function tryFocus() {
+  const cmds = await vscode.commands.getCommands(true);
+  const focusCmd = cmds.find((c) => c === 'claude-vscode.focus' || c === 'claude-code.focus');
+  if (!focusCmd) return false;
+  try {
+    await vscode.commands.executeCommand(focusCmd);
+    await new Promise((r) => setTimeout(r, 120));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Dispatch slash skill execution.
+//   paste    → clipboard only (caller already wrote) — user pastes manually
+//   auto     → focus + OS keystroke Cmd/Ctrl+V + Enter (fully autonomous)
+//   terminal → send to active terminal with newline
+async function dispatchExec(name, mode) {
+  if (!mode || mode === 'paste' || mode === 'off') return;
+  const text = '/' + name;
+  if (mode === 'auto') {
+    await tryFocus();
+    await new Promise((r) => setTimeout(r, 60));
+    osKeystroke(true);
+    return;
+  }
+  if (mode === 'terminal') {
+    let term = vscode.window.activeTerminal;
+    if (!term) {
+      const named = vscode.window.terminals.find((t) => /claude/i.test(t.name));
+      term = named || vscode.window.terminals[0];
+    }
+    if (!term) term = vscode.window.createTerminal('Claude');
+    term.show(true);
+    term.sendText(text, true);
+    return;
+  }
+}
+
 let PIXEL_MANIFEST = {};
 let PIXEL_DIR = null;
 function loadPixelManifest(extPath) {
@@ -170,6 +251,19 @@ function renderHtml(webview, skills) {
   // Achievements + weekly stats
   const achvStatus = achievements.getStatus(cfg);
   const weekly = userConfig.getWeeklyStats();
+
+  // Buddy character
+  const character = userConfig.getCharacter();
+  const BUDDY_NAMES = userConfig.BUDDY_NAMES;
+  const buddyImg = (() => {
+    if (!PIXEL_DIR) return null;
+    const abs = path.join(PIXEL_DIR, 'buddy', `stage${character.stage}.png`);
+    if (!fs.existsSync(abs)) return null;
+    return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
+  })();
+  const buddyProgress = character.nextThreshold
+    ? Math.round(((character.actions - character.currentThreshold) / (character.nextThreshold - character.currentThreshold)) * 100)
+    : 100;
   // Annotate top skills with their display label
   weekly.topSkills = weekly.topSkills.map((t) => {
     const s = skillByName[t.name];
@@ -298,21 +392,30 @@ function renderHtml(webview, skills) {
         </div>
       </button>`;
   };
+  // Slot i unlocked when character.stage >= i (slot 0 always unlocked)
+  const unlockedSlots = Math.max(1, character.stage + 1);
   const quickbarHtml = `
     <section class="quickbar-section" id="quickbar-section">
       <header>
-        <span class="group-icon">🎮</span>
         <h3>Quick Bar</h3>
-        <span class="sub">(드래그 → 슬롯 / 키 1~6)</span>
+        <span class="sub">(${unlockedSlots}/6 해금 · 진화로 +1)</span>
         <span class="group-line"></span>
       </header>
       <div class="quickbar" id="quickbar">
         ${quickbar.map((s, i) => {
           const key = i + 1;
+          const locked = i >= unlockedSlots;
+          if (locked) {
+            const stageNeed = BUDDY_NAMES[i] || '';
+            return `<div class="qslot locked" data-slot="${i}" data-key="${key}" title="진화 ${stageNeed} 단계에서 해금">
+              <span class="qslot-key">${key}</span>
+              <span class="qslot-lock">🔒</span>
+            </div>`;
+          }
           if (!s) {
             return `<div class="qslot empty" data-slot="${i}" data-key="${key}">
               <span class="qslot-key">${key}</span>
-              <span class="qslot-empty-label">EMPTY</span>
+              <span class="qslot-empty-label">+</span>
             </div>`;
           }
           const userUri = userIconUriFor(s);
@@ -453,6 +556,7 @@ function renderHtml(webview, skills) {
   }
   .toolbar {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     align-items: center;
     margin-bottom: 16px;
@@ -493,6 +597,20 @@ function renderHtml(webview, skills) {
     border-color: var(--frame-strong);
   }
   .toolbar::before { content: '🔍'; font-size: 14px; padding-left: 2px; }
+  .toolbar-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 999 1 160px;
+    min-width: 0;
+  }
+  .toolbar-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+  }
   .bracket-l, .bracket-r { color: var(--accent); font-weight: 700; user-select: none; }
   .search {
     flex: 1;
@@ -527,8 +645,8 @@ function renderHtml(webview, skills) {
   .hidden-group { opacity: 0.6; }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+    gap: 8px;
   }
   /* card entrance animation */
   @keyframes card-in {
@@ -553,8 +671,8 @@ function renderHtml(webview, skills) {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 12px 6px 22px;
+    gap: 4px;
+    padding: 10px 4px 20px;
     border: 3px solid var(--frame);
     background: linear-gradient(180deg, var(--tile-bg) 0%, var(--tile-bg-2) 100%);
     box-shadow:
@@ -619,7 +737,7 @@ function renderHtml(webview, skills) {
   .skill.ghost { opacity: 0.55; filter: grayscale(0.4); }
   .skill-icon { font-size: 32px; line-height: 1; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); }
   .skill-icon-img {
-    width: 48px; height: 48px;
+    width: 40px; height: 40px;
     image-rendering: pixelated; image-rendering: crisp-edges;
     filter: drop-shadow(0 1px 0 rgba(0,0,0,0.6));
   }
@@ -684,15 +802,15 @@ function renderHtml(webview, skills) {
   .sort-btn:hover { color: var(--accent); border-color: var(--accent); }
   .sort-btn.active { color: var(--accent-2); border-color: var(--accent-2); background: var(--frame-strong); }
   .recent-group { margin-bottom: 22px; }
-  .recent-group .grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .recent-group .grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
   /* Quick bar */
-  .quickbar-section { margin-bottom: 22px; }
+  .quickbar-section { margin-bottom: 18px; }
   .quickbar {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     gap: 8px;
-    padding: 10px;
-    border: 3px solid var(--accent-2);
+    padding: 8px;
+    border: 2px solid var(--accent-2);
     background:
       linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%),
       var(--tile-bg-2);
@@ -716,21 +834,47 @@ function renderHtml(webview, skills) {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    padding: 8px 4px;
-    min-height: 76px;
-    border: 2px solid var(--frame);
-    background: var(--tile-bg);
+    padding: 10px 4px 8px;
+    width: 100%;
+    min-height: 90px;
+    border: 3px solid var(--frame);
+    background: linear-gradient(180deg, var(--tile-bg) 0%, var(--tile-bg-2) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 3px 0 0 var(--frame-strong);
     text-align: center;
-    transition: all 0.12s;
+    transition: transform 0.08s, border-color 0.12s, box-shadow 0.12s;
+    clip-path: polygon(
+      0 5px, 5px 0,
+      calc(100% - 5px) 0, 100% 5px,
+      100% calc(100% - 5px), calc(100% - 5px) 100%,
+      5px 100%, 0 calc(100% - 5px)
+    );
   }
-  .qslot:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .qslot:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 0 0 var(--frame-strong), 0 0 12px rgba(125, 211, 252, 0.3);
+  }
   .qslot:active { transform: translateY(0); }
   .qslot.empty {
     border-style: dashed;
     background:
-      repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(90, 98, 115, 0.15) 5px, rgba(90, 98, 115, 0.15) 10px),
+      repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(90, 98, 115, 0.12) 4px, rgba(90, 98, 115, 0.12) 8px),
       var(--tile-bg-2);
     color: var(--muted);
+  }
+  .qslot.locked {
+    cursor: not-allowed;
+    opacity: 0.45;
+    border-style: dotted;
+    background: var(--tile-bg-2);
+  }
+  .qslot.locked:hover { transform: none; border-color: var(--frame); }
+  .qslot-lock {
+    font-size: 14px;
+    line-height: 1;
+    filter: grayscale(0.5);
   }
   .qslot.dragover {
     border-color: var(--accent-2);
@@ -739,38 +883,42 @@ function renderHtml(webview, skills) {
   }
   .qslot-key {
     position: absolute;
-    top: 2px;
-    left: 4px;
-    font-size: 9px;
+    top: 1px;
+    left: 2px;
+    font-size: 8px;
     font-weight: 700;
     color: var(--accent-2);
     background: var(--frame-strong);
     border: 1px solid var(--accent-2);
-    padding: 0 4px;
-    line-height: 1.4;
+    padding: 0 3px;
+    line-height: 1.3;
     z-index: 2;
   }
   .qslot-empty-label {
-    font-size: 9px;
-    letter-spacing: 1px;
+    font-size: 28px;
+    letter-spacing: 0;
     color: var(--muted);
-    opacity: 0.6;
+    opacity: 0.4;
+    line-height: 1;
+    margin-top: 8px;
   }
   .qslot-label {
-    font-size: 9px;
+    font-size: 11px;
+    font-weight: 600;
     color: var(--fg);
     word-break: break-word;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    line-height: 1.2;
   }
   .qslot.filled .skill-icon-img {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
   }
   .qslot.filled .skill-icon {
-    font-size: 22px;
+    font-size: 26px;
   }
   .qslot.copied {
     border-color: var(--good);
@@ -781,6 +929,129 @@ function renderHtml(webview, skills) {
   .skill[draggable="true"] { cursor: grab; }
   .skill[draggable="true"]:active { cursor: grabbing; }
   .skill.dragging { opacity: 0.4; }
+
+  /* Free-roaming buddy pet */
+  .buddy-pet {
+    position: fixed;
+    width: 56px;
+    height: 56px;
+    cursor: pointer;
+    z-index: 50;
+    pointer-events: auto;
+    left: 24px;
+    top: 64px;
+    transition: left 1.4s cubic-bezier(0.4, 0, 0.2, 1), top 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+  }
+  .buddy-pet img {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    display: block;
+    animation: pet-bob 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
+  }
+  .buddy-pet:hover img {
+    animation-play-state: paused;
+    filter: drop-shadow(0 0 6px var(--accent-2)) drop-shadow(0 2px 0 rgba(0,0,0,0.5));
+  }
+  .buddy-pet.flipped img { transform: scaleX(-1); }
+  .buddy-pet.cheering img { animation: pet-cheer 0.6s ease-out; }
+  @keyframes pet-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  @keyframes pet-cheer {
+    0% { transform: translateY(0) scale(1); }
+    30% { transform: translateY(-12px) scale(1.15); }
+    60% { transform: translateY(-2px) scale(1.05); }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  /* Buddy hero in modal */
+  .buddy-hero {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--tile-bg-2);
+    border: 2px solid var(--accent-2);
+  }
+  .buddy-portrait {
+    width: 80px;
+    height: 80px;
+    border: 2px solid var(--frame);
+    background: var(--frame-strong);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+  }
+  .buddy-portrait img {
+    width: 100%; height: 100%;
+    image-rendering: pixelated;
+  }
+  .buddy-info { flex: 1; min-width: 0; }
+  .buddy-name-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .buddy-name-row input {
+    flex: 1;
+    padding: 4px 6px;
+    background: var(--tile-bg);
+    color: var(--accent-2);
+    border: 1px solid var(--frame);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    outline: none;
+  }
+  .buddy-name-row input:focus { border-color: var(--accent-2); }
+  .buddy-stage {
+    color: var(--accent);
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .buddy-progress {
+    position: relative;
+    height: 14px;
+    background: var(--frame-strong);
+    border: 1px solid var(--frame);
+    overflow: hidden;
+  }
+  .buddy-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-2) 0%, var(--good) 100%);
+    transition: width 0.4s;
+  }
+  .buddy-progress-label {
+    position: absolute;
+    inset: 0;
+    text-align: center;
+    line-height: 14px;
+    font-size: 9px;
+    color: #fff;
+    text-shadow: 0 0 4px #000;
+  }
+  .buddy-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .buddy-stat {
+    border: 2px solid var(--frame);
+    background: var(--tile-bg-2);
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .buddy-stat .stat-label { font-size: 10px; color: var(--muted); }
+  .buddy-stat .stat-value {
+    font-size: 18px;
+    color: var(--accent);
+    font-weight: 700;
+    line-height: 1.2;
+  }
 
   /* meta toolbar buttons */
   .meta-btn {
@@ -797,6 +1068,41 @@ function renderHtml(webview, skills) {
     flex-shrink: 0;
   }
   .meta-btn:hover { border-color: var(--accent-2); transform: translateY(-1px); }
+
+  /* exec mode toggle */
+  .exec-mode-btn {
+    all: unset;
+    cursor: pointer;
+    height: 24px;
+    padding: 0 8px;
+    border: 2px solid var(--frame);
+    background: var(--tile-bg);
+    color: var(--muted);
+    text-align: center;
+    line-height: 20px;
+    font-size: 10px;
+    font-family: inherit;
+    letter-spacing: 0.4px;
+    transition: all 0.1s;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .exec-mode-btn:hover { border-color: var(--accent); }
+  .exec-mode-btn.mode-paste {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--frame-strong);
+  }
+  .exec-mode-btn.mode-auto {
+    color: var(--accent-2);
+    border-color: var(--accent-2);
+    background: var(--frame-strong);
+  }
+  .exec-mode-btn.mode-terminal {
+    color: var(--good);
+    border-color: var(--good);
+    background: var(--frame-strong);
+  }
 
   /* Wide modal */
   .modal-wide { width: 540px; max-height: 80vh; overflow-y: auto; }
@@ -1009,11 +1315,11 @@ function renderHtml(webview, skills) {
     box-shadow: 0 4px 0 rgba(0,0,0,0.6), 0 0 12px rgba(125,211,252,0.25);
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.15s 0.25s;
+    transition: opacity 0.1s 0.08s;
     z-index: 100;
     white-space: normal;
   }
-  .skill:hover .hover-card { opacity: 1; }
+  .skill:hover .hover-card { opacity: 1; transition-delay: 0.08s; }
   .hover-name { font-weight: 700; color: var(--accent); margin-bottom: 4px; }
   .hover-alias { color: var(--muted); font-weight: 400; font-size: 10px; }
   .hover-desc { color: #cbd5e1; margin-bottom: 6px; }
@@ -1171,18 +1477,23 @@ function renderHtml(webview, skills) {
 </head>
 <body>
   <div class="toolbar">
-    <span class="bracket-l">[</span>
-    <input class="search" placeholder="검색창" id="search" />
-    <span class="bracket-r">]</span>
-    <div class="sort-group" role="tablist" aria-label="정렬">
-      <button class="sort-btn active" data-sort="default" title="기본 정렬">☷</button>
-      <button class="sort-btn" data-sort="recent" title="최근 사용">⏱</button>
-      <button class="sort-btn" data-sort="usage" title="자주 사용">★</button>
+    <div class="toolbar-search">
+      <span class="bracket-l">[</span>
+      <input class="search" placeholder="검색창" id="search" />
+      <span class="bracket-r">]</span>
     </div>
-    <button class="meta-btn" id="achv-btn" title="업적 보드">🏆</button>
-    <button class="meta-btn" id="report-btn" title="위클리 리포트">📊</button>
-    <button class="sound-toggle" id="sound-toggle" title="사운드 on/off">♪</button>
-    <button class="scanlines-toggle" id="scanlines-toggle" title="CRT 효과 on/off">▦</button>
+    <div class="toolbar-buttons">
+      <div class="sort-group" role="tablist" aria-label="정렬">
+        <button class="sort-btn active" data-sort="default" title="기본 정렬">☷</button>
+        <button class="sort-btn" data-sort="recent" title="최근 사용">⏱</button>
+        <button class="sort-btn" data-sort="usage" title="자주 사용">★</button>
+      </div>
+      <button class="meta-btn" id="achv-btn" title="업적 보드">🏆</button>
+      <button class="meta-btn" id="report-btn" title="위클리 리포트">📊</button>
+      <button class="exec-mode-btn" id="exec-mode-btn" title="실행 방식">▶ Off</button>
+      <button class="sound-toggle" id="sound-toggle" title="사운드 on/off">♪</button>
+      <button class="scanlines-toggle" id="scanlines-toggle" title="CRT 효과 on/off">▦</button>
+    </div>
   </div>
   <div id="content">${quickbarHtml + recentSection + sections + hiddenSection || '<div class="empty">스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.</div>'}</div>
   <div class="footer">
@@ -1193,6 +1504,9 @@ function renderHtml(webview, skills) {
     <span id="footer-hint">클릭 → 복사 · 우클릭 → SKILL.md · ✎ → 편집</span>
   </div>
   <div class="toast" id="toast"></div>
+  <div class="buddy-pet" id="buddy-pet" title="${escapeHtml(character.name)} — ${escapeHtml(character.stageName)}">
+    ${buddyImg ? `<img src="${buddyImg}" alt="${escapeHtml(character.name)}" />` : '🥚'}
+  </div>
 
   <div class="modal-bg" id="modal-bg">
     <div class="modal" id="modal">
@@ -1239,6 +1553,48 @@ function renderHtml(webview, skills) {
       </div>
       <div class="modal-actions">
         <button class="btn" id="achv-close">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="buddy-bg">
+    <div class="modal modal-wide">
+      <h4>🪄 캐릭터 시트</h4>
+      <div class="buddy-hero">
+        <div class="buddy-portrait">
+          ${buddyImg ? `<img src="${buddyImg}" alt="${escapeHtml(character.name)}" />` : '🥚'}
+        </div>
+        <div class="buddy-info">
+          <div class="buddy-name-row">
+            <input type="text" id="buddy-name-input" value="${escapeHtml(character.name)}" maxlength="20" />
+            <button class="btn" id="buddy-save-name">저장</button>
+          </div>
+          <div class="buddy-stage">${escapeHtml(character.stageName)} <span class="hint">(LV.${character.stage + 1}/7)</span></div>
+          <div class="buddy-progress">
+            <div class="buddy-progress-bar" style="width: ${buddyProgress}%"></div>
+            <div class="buddy-progress-label">
+              ${character.nextThreshold
+                ? `${character.actions} / ${character.nextThreshold} → ${escapeHtml(BUDDY_NAMES[character.stage + 1])}`
+                : `MAX (${character.actions})`}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="buddy-stats">
+        ${[
+          ['🧠 INT', 'int', '사고/계획/리뷰 스킬에서 성장'],
+          ['⚡ DEX', 'dex', 'Quick Bar는 2배'],
+          ['❤️ VIT', 'vit', '데일리 스트릭 매일 +1'],
+          ['🍀 LCK', 'lck', '업적 1개당 +5'],
+        ].map(([label, key, hint]) => `
+          <div class="buddy-stat" title="${hint}">
+            <div class="stat-label">${label}</div>
+            <div class="stat-value">${character.stats[key] || 0}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="buddy-close">닫기</button>
       </div>
     </div>
   </div>
@@ -1360,21 +1716,101 @@ scanlinesBtn.addEventListener('click', () => {
   saveState();
 });
 
-// Achievement board / Weekly report modal toggles
+// Exec mode cycle: paste → auto → terminal → paste
+const EXEC_MODES = ['paste', 'auto', 'terminal'];
+const EXEC_LABELS = { paste: '▶ Paste', auto: '▶ Auto', terminal: '▶ Term' };
+const EXEC_NEXT_HINT = {
+  paste: '클립보드만 복사',
+  auto: '붙여넣기+엔터 자동 (mac/win/linux)',
+  terminal: '터미널 실행',
+};
+const execBtn = document.getElementById('exec-mode-btn');
+function applyExecMode() {
+  const m = STATE.execMode || 'off';
+  execBtn.textContent = EXEC_LABELS[m];
+  execBtn.classList.remove('mode-paste', 'mode-terminal');
+  if (m !== 'off') execBtn.classList.add('mode-' + m);
+  execBtn.title = '실행 방식: ' + EXEC_NEXT_HINT[m] + ' (클릭으로 변경)';
+}
+if (!STATE.execMode || STATE.execMode === 'off') STATE.execMode = 'paste';
+applyExecMode();
+execBtn.addEventListener('click', () => {
+  const cur = STATE.execMode || 'off';
+  const idx = EXEC_MODES.indexOf(cur);
+  STATE.execMode = EXEC_MODES[(idx + 1) % EXEC_MODES.length];
+  saveState();
+  applyExecMode();
+  sfxClick();
+  showToast(EXEC_LABELS[STATE.execMode] + ' — ' + EXEC_NEXT_HINT[STATE.execMode]);
+});
+
+// Modal toggles
 const achvBg = document.getElementById('achv-bg');
 const reportBg = document.getElementById('report-bg');
-document.getElementById('achv-btn').addEventListener('click', () => {
-  achvBg.classList.add('show');
-  sfxOpen();
-});
-document.getElementById('report-btn').addEventListener('click', () => {
-  reportBg.classList.add('show');
-  sfxOpen();
-});
+const buddyBg = document.getElementById('buddy-bg');
+const buddyPet = document.getElementById('buddy-pet');
+document.getElementById('achv-btn').addEventListener('click', () => { achvBg.classList.add('show'); sfxOpen(); });
+document.getElementById('report-btn').addEventListener('click', () => { reportBg.classList.add('show'); sfxOpen(); });
+if (buddyPet) buddyPet.addEventListener('click', () => { buddyBg.classList.add('show'); sfxOpen(); });
 document.getElementById('achv-close').addEventListener('click', () => achvBg.classList.remove('show'));
 document.getElementById('report-close').addEventListener('click', () => reportBg.classList.remove('show'));
+document.getElementById('buddy-close').addEventListener('click', () => buddyBg.classList.remove('show'));
 achvBg.addEventListener('click', (e) => { if (e.target === achvBg) achvBg.classList.remove('show'); });
 reportBg.addEventListener('click', (e) => { if (e.target === reportBg) reportBg.classList.remove('show'); });
+buddyBg.addEventListener('click', (e) => { if (e.target === buddyBg) buddyBg.classList.remove('show'); });
+
+// ---- Free-roaming pet wander ----
+const PET_W = 56;
+let petWanderTimer = null;
+function petMove(x, y) {
+  if (!buddyPet) return;
+  const w = window.innerWidth - PET_W - 16;
+  const h = window.innerHeight - PET_W - 16;
+  const cx = Math.max(8, Math.min(w, x));
+  const cy = Math.max(8, Math.min(h, y));
+  // flip horizontally based on direction
+  const prevLeft = parseFloat(buddyPet.style.left || '24');
+  if (cx > prevLeft + 4) buddyPet.classList.remove('flipped');
+  else if (cx < prevLeft - 4) buddyPet.classList.add('flipped');
+  buddyPet.style.left = cx + 'px';
+  buddyPet.style.top = cy + 'px';
+}
+function petWanderLoop() {
+  if (!buddyPet) return;
+  const w = window.innerWidth - PET_W - 16;
+  const h = window.innerHeight - PET_W - 16;
+  petMove(8 + Math.random() * w, 60 + Math.random() * Math.max(40, h - 80));
+  const next = 6000 + Math.random() * 9000;
+  petWanderTimer = setTimeout(petWanderLoop, next);
+}
+function petToCard(card) {
+  if (!buddyPet || !card) return;
+  const r = card.getBoundingClientRect();
+  // place to the right of the card if room, else left
+  let x = r.right + 6;
+  if (x + PET_W > window.innerWidth - 8) x = r.left - PET_W - 6;
+  const y = r.top + r.height / 2 - PET_W / 2;
+  petMove(x, y);
+  buddyPet.classList.add('cheering');
+  setTimeout(() => buddyPet.classList.remove('cheering'), 700);
+  // re-arm wander timer so we don't immediately wander away
+  if (petWanderTimer) {
+    clearTimeout(petWanderTimer);
+    petWanderTimer = setTimeout(petWanderLoop, 6000);
+  }
+}
+// Initial position + idle loop
+if (buddyPet) {
+  buddyPet.style.left = '24px';
+  buddyPet.style.top = '64px';
+  petWanderTimer = setTimeout(petWanderLoop, 5000);
+}
+document.getElementById('buddy-save-name').addEventListener('click', () => {
+  const name = document.getElementById('buddy-name-input').value.trim();
+  vscode.postMessage({ type: 'setBuddyName', name });
+  showToast('이름 저장: ' + name);
+  sfxClick();
+});
 const modalBg = document.getElementById('modal-bg');
 const mAlias = document.getElementById('m-alias');
 const mNote = document.getElementById('m-note');
@@ -1499,6 +1935,23 @@ window.addEventListener('message', (e) => {
     if (streakEl) streakEl.textContent = '🔥 ' + m.streak + '일';
     if (totalEl) totalEl.textContent = '📊 ' + m.totalCopies + '회';
 
+    // Buddy stage-up celebration
+    if (m.buddy && m.buddy.nextStage > m.buddy.prevStage) {
+      const stageName = m.buddy.stageName;
+      setTimeout(() => {
+        showToast('🎉 ' + (m.buddy.character.name || 'Claude') + ' 진화: ' + stageName + '!');
+        beep({ freq: 523, duration: 0.12, vol: 0.08 });
+        setTimeout(() => beep({ freq: 659, duration: 0.12, vol: 0.08 }), 130);
+        setTimeout(() => beep({ freq: 784, duration: 0.12, vol: 0.08 }), 260);
+        setTimeout(() => beep({ freq: 1047, duration: 0.2, vol: 0.08 }), 390);
+      }, 400);
+    }
+    // Update toolbar avatar tooltip on each tick (image refreshes on next render)
+    const buddyBtn = document.getElementById('buddy-btn');
+    if (buddyBtn && m.buddy && m.buddy.character) {
+      const c = m.buddy.character;
+      buddyBtn.title = c.name + ' — ' + (c.stageName || '');
+    }
     // Achievement unlock toasts (chained, one per second)
     if (Array.isArray(m.newAchievements) && m.newAchievements.length) {
       m.newAchievements.forEach((a, i) => {
@@ -1558,17 +2011,24 @@ applySort();
 
 // ---- Quick Bar interactions ----
 function triggerSkill(name, file, opts) {
-  vscode.postMessage({ type: 'copy', name });
-  showToast('▶ /' + name);
+  vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
+  const prefix = ({ paste: '복사', auto: '자동 실행', terminal: '터미널' })[STATE.execMode] || '복사';
+  showToast('▶ ' + prefix + ': /' + name);
   sfxCopy();
   if (opts && opts.element) {
     opts.element.classList.add('copied');
     setTimeout(() => opts.element.classList.remove('copied'), 600);
+    petToCard(opts.element);
   }
 }
 document.querySelectorAll('.qslot').forEach((slot) => {
-  slot.addEventListener('mouseenter', () => sfxHover());
+  const isLocked = () => slot.classList.contains('locked');
+  slot.addEventListener('mouseenter', () => { if (!isLocked()) sfxHover(); });
   slot.addEventListener('click', () => {
+    if (isLocked()) {
+      showToast('🔒 진화로 해금');
+      return;
+    }
     if (slot.classList.contains('filled')) {
       triggerSkill(slot.dataset.name, slot.dataset.file, { element: slot });
     } else {
@@ -1577,6 +2037,7 @@ document.querySelectorAll('.qslot').forEach((slot) => {
   });
   slot.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    if (isLocked()) return;
     if (slot.classList.contains('filled')) {
       vscode.postMessage({ type: 'setQuickbar', slot: parseInt(slot.dataset.slot, 10), name: null });
       sfxClick();
@@ -1584,12 +2045,14 @@ document.querySelectorAll('.qslot').forEach((slot) => {
     }
   });
   slot.addEventListener('dragover', (e) => {
+    if (isLocked()) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     slot.classList.add('dragover');
   });
   slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
   slot.addEventListener('drop', (e) => {
+    if (isLocked()) return;
     e.preventDefault();
     slot.classList.remove('dragover');
     const name = e.dataTransfer.getData('text/plain');
@@ -1618,7 +2081,7 @@ document.addEventListener('keydown', (e) => {
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= 6) {
     const slot = document.querySelector('.qslot[data-slot="' + (n - 1) + '"]');
-    if (slot && slot.classList.contains('filled')) {
+    if (slot && slot.classList.contains('filled') && !slot.classList.contains('locked')) {
       e.preventDefault();
       triggerSkill(slot.dataset.name, slot.dataset.file, { element: slot });
     }
@@ -1642,11 +2105,13 @@ document.querySelectorAll('.skill').forEach((el) => {
       return;
     }
     const name = el.dataset.name;
-    vscode.postMessage({ type: 'copy', name });
+    vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
     el.classList.add('copied');
     sfxCopy();
+    petToCard(el);
     setTimeout(() => el.classList.remove('copied'), 600);
-    showToast('▶ /' + name);
+    const prefix = ({ paste: '복사', auto: '자동 실행', terminal: '터미널' })[STATE.execMode] || '복사';
+    showToast('▶ ' + prefix + ': /' + name);
   });
   el.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -1693,12 +2158,12 @@ class SkillsViewProvider {
     webviewView.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'copy' && msg.name) {
         await vscode.env.clipboard.writeText('/' + msg.name);
+        await dispatchExec(msg.name, msg.execMode || 'off');
         const result = userConfig.recordUsage(msg.name);
         vscode.window.setStatusBarMessage('Copied: /' + msg.name, 2000);
         for (const v of this.views) {
           v.webview.postMessage({ type: 'usageRecorded', name: msg.name, ...result });
         }
-        // Defer full refresh so card animation finishes first; updates "최근 사용" section
         clearTimeout(this._copyRefreshTimer);
         this._copyRefreshTimer = setTimeout(() => this.refresh(), 1200);
       } else if (msg.type === 'open' && msg.file) {
@@ -1708,6 +2173,10 @@ class SkillsViewProvider {
         userConfig.setQuickbar(msg.slot, msg.name || null);
         clearTimeout(this._quickRefreshTimer);
         this._quickRefreshTimer = setTimeout(() => this.refresh(), 150);
+      } else if (msg.type === 'setBuddyName') {
+        userConfig.setCharacterName(msg.name || '');
+        clearTimeout(this._buddyRefreshTimer);
+        this._buddyRefreshTimer = setTimeout(() => this.refresh(), 200);
       } else if (msg.type === 'saveConfig' && msg.name) {
         const cfg = userConfig.read();
         if (!cfg.skills[msg.name]) cfg.skills[msg.name] = {};

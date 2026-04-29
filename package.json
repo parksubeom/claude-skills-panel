@@ -1,26 +1,38 @@
 {
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
-  "description": "Browse and trigger Claude Code skills from a bottom panel grid",
-  "version": "0.12.1",
-  "publisher": "codnut00",
+  "description": "도트 게임 스타일로 Claude Code 스킬을 한눈에 보고 즉시 실행 — 별칭/아이콘 커스텀, Quick Bar, 캐릭터 육성, 업적 / Pixel-art skill panel for Claude Code with aliases, quick bar, character growth, and achievements.",
+  "version": "0.20.0",
+  "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/parksubeom/claude-skills-panel.git"
   },
+  "bugs": {
+    "url": "https://github.com/parksubeom/claude-skills-panel/issues"
+  },
+  "homepage": "https://github.com/parksubeom/claude-skills-panel#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization",
+    "Keymaps"
   ],
   "keywords": [
     "claude",
     "claude-code",
     "skills",
-    "ai"
+    "ai",
+    "anthropic",
+    "slash-commands",
+    "pixel-art",
+    "gamification",
+    "cursor",
+    "productivity"
   ],
   "main": "./extension.js",
   "activationEvents": [
@@ -95,7 +107,9 @@
   "scripts": {
     "build:icon": "node scripts/build-icon.js",
     "build:pixels": "node scripts/build-pixel-icons.js",
-    "package": "npm run build:pixels && vsce package",
+    "build:spark": "node scripts/build-spark-icons.js",
+    "build:buddy": "node scripts/build-buddy-icons.js",
+    "package": "npm run build:pixels && npm run build:spark && npm run build:buddy && vsce package",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish",
     "publish:all": "npm run package && vsce publish && ovsx publish"
