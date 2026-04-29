@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "도트 게임 스타일로 Claude Code 스킬을 한눈에 보고 즉시 실행 — 별칭/아이콘 커스텀, Quick Bar, 캐릭터 육성, 업적 / Pixel-art skill panel for Claude Code with aliases, quick bar, character growth, and achievements.",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",
