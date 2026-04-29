@@ -530,7 +530,17 @@ function gridToSvg(grid) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}" shape-rendering="crispEdges">${rects.join('')}</svg>`;
 }
 
+async function buildDefault() {
+  const svgPath = path.join(OUT, '_default.svg');
+  if (!fs.existsSync(svgPath)) return;
+  await sharp(fs.readFileSync(svgPath))
+    .resize(96, 96, { kernel: sharp.kernel.nearest })
+    .png()
+    .toFile(path.join(OUT, '_default.png'));
+}
+
 async function build() {
+  await buildDefault();
   const manifest = {};
   for (const [name, grid] of Object.entries(ICONS)) {
     const svg = gridToSvg(grid);
