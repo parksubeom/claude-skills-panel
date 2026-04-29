@@ -12,11 +12,7 @@
 
 ## 미리보기
 
-### 액티비티바 사이드 패널
-![Panel Main](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-main.png)
-
-### 하단 패널 (넓은 화면)
-![Panel Wide](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-wide.png)
+![Claude Code Skills Panel](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-main.png)
 
 ---
 
