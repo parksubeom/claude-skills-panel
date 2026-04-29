@@ -1,8 +1,8 @@
 {
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
-  "description": "Browse and trigger Claude Code skills from a sidebar panel",
-  "version": "0.0.1",
+  "description": "Browse and trigger Claude Code skills from a bottom panel grid",
+  "version": "0.4.1",
   "publisher": "codnut00",
   "license": "MIT",
   "icon": "icon.png",
@@ -30,55 +30,60 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "claudeSkills",
+          "id": "claudeSkillsSidebar",
+          "title": "Claude Skills",
+          "icon": "icon.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "claudeSkillsPanel",
           "title": "Claude Skills",
           "icon": "icon.svg"
         }
       ]
     },
     "views": {
-      "claudeSkills": [
+      "claudeSkillsSidebar": [
         {
-          "id": "claudeSkillsList",
-          "name": "Skills"
+          "id": "claudeSkillsGridSidebar",
+          "name": "Skills",
+          "type": "webview"
+        }
+      ],
+      "claudeSkillsPanel": [
+        {
+          "id": "claudeSkillsGridPanel",
+          "name": "Skills",
+          "type": "webview"
         }
       ]
     },
     "commands": [
       {
         "command": "claudeSkills.refresh",
-        "title": "Refresh",
+        "title": "Refresh Claude Skills",
         "icon": "$(refresh)"
       },
       {
-        "command": "claudeSkills.copyTrigger",
-        "title": "Copy /skill trigger"
-      },
-      {
-        "command": "claudeSkills.openFile",
-        "title": "Open SKILL.md"
+        "command": "claudeSkills.show",
+        "title": "Show Claude Skills Panel"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "claudeSkills.refresh",
-          "when": "view == claudeSkillsList",
+          "when": "view == claudeSkillsGridSidebar || view == claudeSkillsGridPanel",
           "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "claudeSkills.openFile",
-          "when": "view == claudeSkillsList && viewItem == skill",
-          "group": "inline"
         }
       ]
     }
   },
   "scripts": {
     "build:icon": "node scripts/build-icon.js",
-    "package": "vsce package",
+    "build:pixels": "node scripts/build-pixel-icons.js",
+    "package": "npm run build:pixels && vsce package",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish",
     "publish:all": "npm run package && vsce publish && ovsx publish"

@@ -5,3 +5,8 @@ node_modules/**
 scripts/**
 **/*.map
 **/.DS_Store
+
+# build-time only — not needed at runtime
+source-icons.png
+assets/pixel-icons/*.svg
+*.vsix
