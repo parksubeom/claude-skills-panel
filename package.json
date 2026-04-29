@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "Browse and trigger Claude Code skills from a bottom panel grid",
-  "version": "0.4.1",
+  "version": "0.8.0",
   "publisher": "codnut00",
   "license": "MIT",
   "icon": "icon.png",
@@ -68,6 +68,10 @@
       {
         "command": "claudeSkills.show",
         "title": "Show Claude Skills Panel"
+      },
+      {
+        "command": "claudeSkills.openConfig",
+        "title": "Open Claude Skills Config"
       }
     ],
     "menus": {
