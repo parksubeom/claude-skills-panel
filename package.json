@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "Browse and trigger Claude Code skills from a bottom panel grid",
-  "version": "0.10.1",
+  "version": "0.12.1",
   "publisher": "codnut00",
   "license": "MIT",
   "icon": "icon.png",
@@ -72,7 +72,15 @@
       {
         "command": "claudeSkills.openConfig",
         "title": "Open Claude Skills Config"
-      }
+      },
+      { "command": "claudeSkills.quickSlot1", "title": "Claude Skills: Quick Slot 1" },
+      { "command": "claudeSkills.quickSlot2", "title": "Claude Skills: Quick Slot 2" },
+      { "command": "claudeSkills.quickSlot3", "title": "Claude Skills: Quick Slot 3" },
+      { "command": "claudeSkills.quickSlot4", "title": "Claude Skills: Quick Slot 4" },
+      { "command": "claudeSkills.quickSlot5", "title": "Claude Skills: Quick Slot 5" },
+      { "command": "claudeSkills.quickSlot6", "title": "Claude Skills: Quick Slot 6" },
+      { "command": "claudeSkills.showAchievements", "title": "Claude Skills: Show Achievements" },
+      { "command": "claudeSkills.showWeeklyReport", "title": "Claude Skills: Show Weekly Report" }
     ],
     "menus": {
       "view/title": [

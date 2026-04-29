@@ -85,7 +85,7 @@ function yesterdayKey() {
   return localDateKey(d);
 }
 
-// Records a copy event. Returns { prevLevel, nextLevel, streak, totalCopies }.
+// Records a copy event. Returns { prevLevel, nextLevel, streak, totalCopies, newAchievements }.
 function recordUsage(name) {
   const cfg = read();
   if (!cfg.meta) cfg.meta = {};
@@ -104,8 +104,17 @@ function recordUsage(name) {
 
   cfg.meta.totalCopies = (cfg.meta.totalCopies || 0) + 1;
 
-  // streak update
+  // Daily history (for weekly report)
+  if (!cfg.meta.dailyHistory) cfg.meta.dailyHistory = {};
   const today = todayKey();
+  cfg.meta.dailyHistory[today] = (cfg.meta.dailyHistory[today] || 0) + 1;
+  // Cap history to last 60 days
+  const keys = Object.keys(cfg.meta.dailyHistory).sort();
+  if (keys.length > 60) {
+    for (const k of keys.slice(0, keys.length - 60)) delete cfg.meta.dailyHistory[k];
+  }
+
+  // streak update
   const yesterday = yesterdayKey();
   const last = cfg.meta.streak && cfg.meta.streak.lastDate;
   if (last !== today) {
@@ -114,12 +123,17 @@ function recordUsage(name) {
     cfg.meta.streak.lastDate = today;
   }
 
+  // Achievements (lazy require to avoid cycle)
+  const achievements = require('./achievements');
+  const { newly } = achievements.checkAndApply(cfg);
+
   write(cfg);
   return {
     prevLevel,
     nextLevel,
     streak: cfg.meta.streak.days,
     totalCopies: cfg.meta.totalCopies,
+    newAchievements: newly,
   };
 }
 
@@ -128,7 +142,66 @@ function getMeta() {
   const meta = cfg.meta || {};
   if (typeof meta.totalCopies !== 'number') meta.totalCopies = 0;
   if (!meta.streak) meta.streak = { days: 0, lastDate: null };
+  if (!Array.isArray(meta.quickbar)) meta.quickbar = [null, null, null, null, null, null];
+  while (meta.quickbar.length < 6) meta.quickbar.push(null);
+  if (meta.quickbar.length > 6) meta.quickbar = meta.quickbar.slice(0, 6);
+  if (!Array.isArray(meta.achievements)) meta.achievements = [];
+  if (!meta.dailyHistory) meta.dailyHistory = {};
   return meta;
+}
+
+// Compute weekly stats for the report
+function getWeeklyStats() {
+  const cfg = read();
+  const meta = getMeta();
+  const skills = cfg.skills || {};
+
+  // Last 7 days of activity
+  const days = [];
+  const counts = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const k = localDateKey(d);
+    days.push(k);
+    counts.push(meta.dailyHistory[k] || 0);
+  }
+  const weekTotal = counts.reduce((a, b) => a + b, 0);
+
+  // Most-used skill within last 7 days based on lastUsed proxy + count weight
+  const recentSkills = Object.entries(skills)
+    .filter(([, v]) => v.usage && v.usage.lastUsed)
+    .map(([name, v]) => {
+      const lastDay = (v.usage.lastUsed || '').slice(0, 10);
+      const inWeek = days.includes(lastDay);
+      return { name, count: v.usage.count, lastUsed: v.usage.lastUsed, inWeek };
+    })
+    .filter((s) => s.inWeek);
+  recentSkills.sort((a, b) => b.count - a.count);
+
+  return {
+    days,
+    counts,
+    weekTotal,
+    topSkills: recentSkills.slice(0, 5),
+    streakDays: meta.streak.days,
+    totalCopies: meta.totalCopies,
+  };
+}
+
+function setQuickbar(slot, name) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  if (!Array.isArray(cfg.meta.quickbar)) cfg.meta.quickbar = [null, null, null, null, null, null];
+  while (cfg.meta.quickbar.length < 6) cfg.meta.quickbar.push(null);
+  if (slot < 0 || slot > 5) return cfg;
+  // If name is already in another slot, clear that first (no duplicates)
+  if (name) {
+    cfg.meta.quickbar = cfg.meta.quickbar.map((n) => (n === name ? null : n));
+  }
+  cfg.meta.quickbar[slot] = name || null;
+  write(cfg);
+  return cfg;
 }
 
 function resolveIconPath(iconRel) {
@@ -149,6 +222,8 @@ module.exports = {
   resolveIconPath,
   recordUsage,
   getMeta,
+  getWeeklyStats,
+  setQuickbar,
   levelFor,
   LEVEL_THRESHOLDS,
 };

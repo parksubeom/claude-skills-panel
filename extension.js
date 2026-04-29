@@ -4,6 +4,7 @@ const path = require('path');
 const os = require('os');
 const { pickIcon } = require('./iconMap');
 const userConfig = require('./userConfig');
+const achievements = require('./achievements');
 
 let PIXEL_MANIFEST = {};
 let PIXEL_DIR = null;
@@ -161,6 +162,20 @@ function renderHtml(webview, skills) {
     .sort((a, b) => new Date(b.usage.lastUsed) - new Date(a.usage.lastUsed))
     .slice(0, 6);
 
+  // Quick bar: 6 slots, each holds a skill name or null
+  const skillByName = {};
+  for (const s of enriched) skillByName[s.aliasOriginal] = s;
+  const quickbar = (meta.quickbar || []).map((name) => (name && skillByName[name]) || null);
+
+  // Achievements + weekly stats
+  const achvStatus = achievements.getStatus(cfg);
+  const weekly = userConfig.getWeeklyStats();
+  // Annotate top skills with their display label
+  weekly.topSkills = weekly.topSkills.map((t) => {
+    const s = skillByName[t.name];
+    return { ...t, label: (s && s.label) || t.name };
+  });
+
   const pixelUriFor = (name) => {
     const file = PIXEL_MANIFEST[name];
     if (!file || !PIXEL_DIR) return null;
@@ -283,6 +298,42 @@ function renderHtml(webview, skills) {
         </div>
       </button>`;
   };
+  const quickbarHtml = `
+    <section class="quickbar-section" id="quickbar-section">
+      <header>
+        <span class="group-icon">🎮</span>
+        <h3>Quick Bar</h3>
+        <span class="sub">(드래그 → 슬롯 / 키 1~6)</span>
+        <span class="group-line"></span>
+      </header>
+      <div class="quickbar" id="quickbar">
+        ${quickbar.map((s, i) => {
+          const key = i + 1;
+          if (!s) {
+            return `<div class="qslot empty" data-slot="${i}" data-key="${key}">
+              <span class="qslot-key">${key}</span>
+              <span class="qslot-empty-label">EMPTY</span>
+            </div>`;
+          }
+          const userUri = userIconUriFor(s);
+          const pngUri = userUri || pixelUriFor(s.aliasOriginal) || defaultIconUri;
+          const iconHtml = pngUri
+            ? `<img class="skill-icon-img${userUri ? ' user-icon' : ''}" src="${pngUri}" alt="${escapeHtml(s.aliasOriginal)}" />`
+            : `<div class="skill-icon">${pickIcon(s)}</div>`;
+          return `<button class="qslot filled"
+              data-slot="${i}"
+              data-key="${key}"
+              data-name="${escapeHtml(s.aliasOriginal)}"
+              data-file="${escapeHtml(s.file)}"
+              title="/${escapeHtml(s.aliasOriginal)} — Key ${key}">
+            <span class="qslot-key">${key}</span>
+            ${iconHtml}
+            <span class="qslot-label">${escapeHtml(s.label)}</span>
+          </button>`;
+        }).join('')}
+      </div>
+    </section>`;
+
   const recentSection = recents.length
     ? `<section class="group recent-group">
         <header>
@@ -503,7 +554,7 @@ function renderHtml(webview, skills) {
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 12px 6px 10px;
+    padding: 12px 6px 22px;
     border: 3px solid var(--frame);
     background: linear-gradient(180deg, var(--tile-bg) 0%, var(--tile-bg-2) 100%);
     box-shadow:
@@ -580,13 +631,17 @@ function renderHtml(webview, skills) {
   }
   .skill-original { font-size: 9px; color: var(--muted); margin-top: -3px; }
   .stars {
-    display: block;
+    position: absolute;
+    bottom: 5px;
+    left: 0;
+    right: 0;
+    text-align: center;
     font-size: 10px;
     letter-spacing: 1px;
     line-height: 1;
-    margin-top: 2px;
     user-select: none;
     text-shadow: 0 0 4px currentColor;
+    pointer-events: none;
   }
   .stars.lv0 { color: var(--frame); text-shadow: none; }
   .stars.lv1 { color: #94a3b8; }
@@ -596,8 +651,8 @@ function renderHtml(webview, skills) {
   .stars.lv5 { color: var(--accent-2); }
   .lv-badge {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
+    top: 4px;
+    left: 4px;
     font-size: 8px;
     font-weight: 700;
     padding: 1px 4px;
@@ -630,6 +685,246 @@ function renderHtml(webview, skills) {
   .sort-btn.active { color: var(--accent-2); border-color: var(--accent-2); background: var(--frame-strong); }
   .recent-group { margin-bottom: 22px; }
   .recent-group .grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  /* Quick bar */
+  .quickbar-section { margin-bottom: 22px; }
+  .quickbar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    padding: 10px;
+    border: 3px solid var(--accent-2);
+    background:
+      linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%),
+      var(--tile-bg-2);
+    box-shadow:
+      inset 0 0 0 1px #000,
+      0 0 0 1px var(--frame-strong),
+      0 4px 0 0 rgba(0, 0, 0, 0.4);
+    clip-path: polygon(
+      0 6px, 6px 0,
+      calc(100% - 6px) 0, 100% 6px,
+      100% calc(100% - 6px), calc(100% - 6px) 100%,
+      6px 100%, 0 calc(100% - 6px)
+    );
+  }
+  .qslot {
+    all: unset;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
+    min-height: 76px;
+    border: 2px solid var(--frame);
+    background: var(--tile-bg);
+    text-align: center;
+    transition: all 0.12s;
+  }
+  .qslot:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .qslot:active { transform: translateY(0); }
+  .qslot.empty {
+    border-style: dashed;
+    background:
+      repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(90, 98, 115, 0.15) 5px, rgba(90, 98, 115, 0.15) 10px),
+      var(--tile-bg-2);
+    color: var(--muted);
+  }
+  .qslot.dragover {
+    border-color: var(--accent-2);
+    background: rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+  }
+  .qslot-key {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--accent-2);
+    background: var(--frame-strong);
+    border: 1px solid var(--accent-2);
+    padding: 0 4px;
+    line-height: 1.4;
+    z-index: 2;
+  }
+  .qslot-empty-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+  .qslot-label {
+    font-size: 9px;
+    color: var(--fg);
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+  .qslot.filled .skill-icon-img {
+    width: 32px;
+    height: 32px;
+  }
+  .qslot.filled .skill-icon {
+    font-size: 22px;
+  }
+  .qslot.copied {
+    border-color: var(--good);
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.6);
+    animation: shake 0.3s;
+  }
+  /* Make skill cards draggable cursor */
+  .skill[draggable="true"] { cursor: grab; }
+  .skill[draggable="true"]:active { cursor: grabbing; }
+  .skill.dragging { opacity: 0.4; }
+
+  /* meta toolbar buttons */
+  .meta-btn {
+    all: unset;
+    cursor: pointer;
+    width: 24px; height: 24px;
+    border: 2px solid var(--frame);
+    background: var(--tile-bg);
+    color: var(--accent-2);
+    text-align: center;
+    line-height: 20px;
+    font-size: 11px;
+    transition: all 0.1s;
+    flex-shrink: 0;
+  }
+  .meta-btn:hover { border-color: var(--accent-2); transform: translateY(-1px); }
+
+  /* Wide modal */
+  .modal-wide { width: 540px; max-height: 80vh; overflow-y: auto; }
+  .modal-wide h4 { color: var(--accent-2); margin-bottom: 12px; }
+
+  /* Achievements grid */
+  .achv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .achv {
+    position: relative;
+    padding: 10px 6px 6px;
+    border: 2px solid var(--frame);
+    background: var(--tile-bg-2);
+    text-align: center;
+    transition: all 0.12s;
+  }
+  .achv.unlocked {
+    border-color: var(--accent-2);
+    background: linear-gradient(180deg, rgba(245,158,11,0.15) 0%, var(--tile-bg-2) 100%);
+    box-shadow: inset 0 0 0 1px rgba(245,158,11,0.3), 0 0 8px rgba(245,158,11,0.2);
+  }
+  .achv.locked { opacity: 0.4; filter: grayscale(0.7); }
+  .achv-icon { font-size: 26px; line-height: 1; margin-bottom: 4px; }
+  .achv-name { font-size: 11px; font-weight: 700; color: var(--fg); margin-bottom: 2px; }
+  .achv-desc { font-size: 9px; color: var(--muted); line-height: 1.3; }
+  .achv-tag {
+    position: absolute;
+    top: 2px; right: 2px;
+    background: var(--accent-2);
+    color: #1a1f2c;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border: 1px solid #c2410c;
+    line-height: 1.2;
+  }
+
+  /* Weekly report */
+  .report-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .stat-card {
+    border: 2px solid var(--frame);
+    background: var(--tile-bg-2);
+    padding: 8px;
+    text-align: center;
+  }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; }
+  .stat-value {
+    font-size: 22px;
+    color: var(--accent-2);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 2px;
+    text-shadow: 0 0 6px rgba(245,158,11,0.4);
+  }
+  .stat-unit { font-size: 11px; color: var(--muted); margin-left: 2px; }
+  .report-section { margin-bottom: 14px; }
+  .report-title { font-size: 10px; color: var(--accent); margin-bottom: 6px; letter-spacing: 0.5px; }
+  .day-bars {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    height: 80px;
+    align-items: end;
+  }
+  .day-bar {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .day-bar-fill {
+    width: 100%;
+    background: linear-gradient(180deg, var(--accent-2) 0%, var(--good) 100%);
+    min-height: 2px;
+    transition: height 0.3s;
+    border: 1px solid #000;
+  }
+  .day-bar-count {
+    position: absolute;
+    top: -12px;
+    font-size: 9px;
+    color: var(--accent-2);
+  }
+  .day-bar-label {
+    position: absolute;
+    bottom: -16px;
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .top-skills { list-style: none; padding: 0; margin: 0; }
+  .top-skills li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-bottom: 1px dashed var(--frame);
+    font-size: 11px;
+  }
+  .top-skills li:last-child { border-bottom: none; }
+  .top-skills .rank {
+    color: var(--accent-2);
+    font-weight: 700;
+    width: 24px;
+  }
+  .top-skills .top-name { flex: 1; color: var(--fg); }
+  .top-skills .top-count { color: var(--muted); }
+  .report-empty { text-align: center; color: var(--muted); padding: 16px; }
+
+  /* Achievement unlock toast (special) */
+  .toast.achv-unlock {
+    background: #0b0d12;
+    color: var(--accent-2);
+    border-color: var(--accent-2);
+    box-shadow: inset 0 0 0 1px #000, 0 4px 0 #000, 0 0 24px rgba(245,158,11,0.6);
+    font-size: 12px;
+    padding: 10px 22px;
+  }
   .footer-streak, .footer-total {
     color: var(--accent-2);
     font-weight: 600;
@@ -653,7 +948,7 @@ function renderHtml(webview, skills) {
   .kind-badge {
     position: absolute;
     top: 4px;
-    left: 4px;
+    right: 4px;
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -665,7 +960,9 @@ function renderHtml(webview, skills) {
     text-transform: uppercase;
     z-index: 4;
     line-height: 1.2;
+    transition: opacity 0.12s;
   }
+  .skill:hover .kind-badge { opacity: 0; }
   .kind-badge.cmd { color: var(--good); border-color: var(--good); }
   .edit-btn {
     position: absolute;
@@ -882,10 +1179,12 @@ function renderHtml(webview, skills) {
       <button class="sort-btn" data-sort="recent" title="최근 사용">⏱</button>
       <button class="sort-btn" data-sort="usage" title="자주 사용">★</button>
     </div>
+    <button class="meta-btn" id="achv-btn" title="업적 보드">🏆</button>
+    <button class="meta-btn" id="report-btn" title="위클리 리포트">📊</button>
     <button class="sound-toggle" id="sound-toggle" title="사운드 on/off">♪</button>
     <button class="scanlines-toggle" id="scanlines-toggle" title="CRT 효과 on/off">▦</button>
   </div>
-  <div id="content">${recentSection + sections + hiddenSection || '<div class="empty">스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.</div>'}</div>
+  <div id="content">${quickbarHtml + recentSection + sections + hiddenSection || '<div class="empty">스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.</div>'}</div>
   <div class="footer">
     <span class="footer-streak" id="footer-streak">${meta.streak.days > 0 ? `🔥 ${meta.streak.days}일` : '🔥 0일'}</span>
     <span class="sep">|</span>
@@ -921,6 +1220,77 @@ function renderHtml(webview, skills) {
         <button class="btn btn-danger" id="m-reset">초기화</button>
         <button class="btn" id="m-cancel">취소</button>
         <button class="btn btn-primary" id="m-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="achv-bg">
+    <div class="modal modal-wide">
+      <h4>🏆 업적 보드 <span class="hint">${achvStatus.filter(a => a.earned).length} / ${achvStatus.length}</span></h4>
+      <div class="achv-grid">
+        ${achvStatus.map(a => `
+          <div class="achv ${a.earned ? 'unlocked' : 'locked'}" title="${escapeHtml(a.desc)}">
+            <div class="achv-icon">${a.icon}</div>
+            <div class="achv-name">${escapeHtml(a.name)}</div>
+            <div class="achv-desc">${escapeHtml(a.desc)}</div>
+            ${a.earned ? '<span class="achv-tag">달성</span>' : ''}
+          </div>
+        `).join('')}
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="achv-close">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="report-bg">
+    <div class="modal modal-wide">
+      <h4>📊 위클리 리포트</h4>
+      <div class="report-stats">
+        <div class="stat-card">
+          <div class="stat-label">이번 주 사용</div>
+          <div class="stat-value">${weekly.weekTotal}<span class="stat-unit">회</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">스트릭</div>
+          <div class="stat-value">${weekly.streakDays}<span class="stat-unit">일</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">전체 누적</div>
+          <div class="stat-value">${weekly.totalCopies}<span class="stat-unit">회</span></div>
+        </div>
+      </div>
+      <div class="report-section">
+        <div class="report-title">최근 7일 활동</div>
+        <div class="day-bars">
+          ${weekly.days.map((d, i) => {
+            const c = weekly.counts[i];
+            const max = Math.max(...weekly.counts, 1);
+            const h = Math.round((c / max) * 100);
+            const dayLabel = d.slice(5).replace('-', '/');
+            return `<div class="day-bar" title="${d} — ${c}회">
+              <div class="day-bar-fill" style="height: ${h}%"></div>
+              <div class="day-bar-count">${c || ''}</div>
+              <div class="day-bar-label">${dayLabel}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      ${weekly.topSkills.length ? `
+      <div class="report-section">
+        <div class="report-title">이번 주 TOP 5</div>
+        <ol class="top-skills">
+          ${weekly.topSkills.map((t, i) => `
+            <li>
+              <span class="rank">#${i + 1}</span>
+              <span class="top-name">${escapeHtml(t.label)}</span>
+              <span class="top-count">${t.count}회</span>
+            </li>
+          `).join('')}
+        </ol>
+      </div>` : `<div class="report-empty">이번 주 사용 기록이 없습니다.</div>`}
+      <div class="modal-actions">
+        <button class="btn" id="report-close">닫기</button>
       </div>
     </div>
   </div>
@@ -989,6 +1359,22 @@ scanlinesBtn.addEventListener('click', () => {
   document.body.classList.toggle('no-scanlines', !STATE.scanlines);
   saveState();
 });
+
+// Achievement board / Weekly report modal toggles
+const achvBg = document.getElementById('achv-bg');
+const reportBg = document.getElementById('report-bg');
+document.getElementById('achv-btn').addEventListener('click', () => {
+  achvBg.classList.add('show');
+  sfxOpen();
+});
+document.getElementById('report-btn').addEventListener('click', () => {
+  reportBg.classList.add('show');
+  sfxOpen();
+});
+document.getElementById('achv-close').addEventListener('click', () => achvBg.classList.remove('show'));
+document.getElementById('report-close').addEventListener('click', () => reportBg.classList.remove('show'));
+achvBg.addEventListener('click', (e) => { if (e.target === achvBg) achvBg.classList.remove('show'); });
+reportBg.addEventListener('click', (e) => { if (e.target === reportBg) reportBg.classList.remove('show'); });
 const modalBg = document.getElementById('modal-bg');
 const mAlias = document.getElementById('m-alias');
 const mNote = document.getElementById('m-note');
@@ -1070,6 +1456,8 @@ window.addEventListener('message', (e) => {
     pendingIconClear = false;
     setIconPreview(m.uri, m.size);
   }
+  if (m && m.type === 'showAchievements') achvBg.classList.add('show');
+  if (m && m.type === 'showWeeklyReport') reportBg.classList.add('show');
   if (m && m.type === 'usageRecorded') {
     // Update card data attrs + stars, no full refresh
     document.querySelectorAll('.skill[data-name="' + m.name.replace(/"/g, '\\\\"') + '"]').forEach((el) => {
@@ -1110,8 +1498,33 @@ window.addEventListener('message', (e) => {
     const totalEl = document.getElementById('footer-total');
     if (streakEl) streakEl.textContent = '🔥 ' + m.streak + '일';
     if (totalEl) totalEl.textContent = '📊 ' + m.totalCopies + '회';
+
+    // Achievement unlock toasts (chained, one per second)
+    if (Array.isArray(m.newAchievements) && m.newAchievements.length) {
+      m.newAchievements.forEach((a, i) => {
+        setTimeout(() => {
+          showAchvToast(a);
+          // celebration chime
+          beep({ freq: 660, duration: 0.1, vol: 0.08 });
+          setTimeout(() => beep({ freq: 990, duration: 0.1, vol: 0.08 }), 100);
+          setTimeout(() => beep({ freq: 1320, duration: 0.18, vol: 0.08 }), 220);
+        }, 800 + i * 1500);
+      });
+    }
   }
 });
+
+function showAchvToast(a) {
+  const t = document.getElementById('toast');
+  t.classList.add('achv-unlock');
+  t.textContent = '🏆 업적 해제: ' + a.icon + ' ' + a.name;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.classList.remove('achv-unlock'), 200);
+  }, 2400);
+}
 
 // Sort
 const SORT = { mode: STATE.sort || 'default' };
@@ -1142,14 +1555,84 @@ document.querySelectorAll('.sort-btn').forEach((btn) => {
   });
 });
 applySort();
+
+// ---- Quick Bar interactions ----
+function triggerSkill(name, file, opts) {
+  vscode.postMessage({ type: 'copy', name });
+  showToast('▶ /' + name);
+  sfxCopy();
+  if (opts && opts.element) {
+    opts.element.classList.add('copied');
+    setTimeout(() => opts.element.classList.remove('copied'), 600);
+  }
+}
+document.querySelectorAll('.qslot').forEach((slot) => {
+  slot.addEventListener('mouseenter', () => sfxHover());
+  slot.addEventListener('click', () => {
+    if (slot.classList.contains('filled')) {
+      triggerSkill(slot.dataset.name, slot.dataset.file, { element: slot });
+    } else {
+      showToast('드래그해서 등록 · 키 ' + slot.dataset.key);
+    }
+  });
+  slot.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (slot.classList.contains('filled')) {
+      vscode.postMessage({ type: 'setQuickbar', slot: parseInt(slot.dataset.slot, 10), name: null });
+      sfxClick();
+      showToast('슬롯 ' + slot.dataset.key + ' 비움');
+    }
+  });
+  slot.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    slot.classList.add('dragover');
+  });
+  slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
+  slot.addEventListener('drop', (e) => {
+    e.preventDefault();
+    slot.classList.remove('dragover');
+    const name = e.dataTransfer.getData('text/plain');
+    if (!name) return;
+    vscode.postMessage({ type: 'setQuickbar', slot: parseInt(slot.dataset.slot, 10), name });
+    sfxOpen();
+    showToast('슬롯 ' + slot.dataset.key + ' 등록: /' + name);
+  });
+});
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && modalBg.classList.contains('show')) closeModal();
+  if (e.key === 'Escape') {
+    if (modalBg.classList.contains('show')) closeModal();
+    else if (achvBg.classList.contains('show')) achvBg.classList.remove('show');
+    else if (reportBg.classList.contains('show')) reportBg.classList.remove('show');
+  }
+  if (e.key === 'Escape' && modalBg.classList.contains('show')) return;
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && modalBg.classList.contains('show')) {
     document.getElementById('m-save').click();
+  }
+  // Number 1-6 → quick slot trigger
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (modalBg.classList.contains('show')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 6) {
+    const slot = document.querySelector('.qslot[data-slot="' + (n - 1) + '"]');
+    if (slot && slot.classList.contains('filled')) {
+      e.preventDefault();
+      triggerSkill(slot.dataset.name, slot.dataset.file, { element: slot });
+    }
   }
 });
 
 document.querySelectorAll('.skill').forEach((el) => {
+  el.draggable = true;
+  el.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', el.dataset.name);
+    e.dataTransfer.effectAllowed = 'copy';
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => el.classList.remove('dragging'));
   el.addEventListener('mouseenter', () => sfxHover());
   el.addEventListener('click', (e) => {
     if (e.target.classList.contains('edit-btn')) {
@@ -1221,6 +1704,10 @@ class SkillsViewProvider {
       } else if (msg.type === 'open' && msg.file) {
         const doc = await vscode.workspace.openTextDocument(msg.file);
         vscode.window.showTextDocument(doc);
+      } else if (msg.type === 'setQuickbar' && typeof msg.slot === 'number') {
+        userConfig.setQuickbar(msg.slot, msg.name || null);
+        clearTimeout(this._quickRefreshTimer);
+        this._quickRefreshTimer = setTimeout(() => this.refresh(), 150);
       } else if (msg.type === 'saveConfig' && msg.name) {
         const cfg = userConfig.read();
         if (!cfg.skills[msg.name]) cfg.skills[msg.name] = {};
@@ -1301,8 +1788,39 @@ function activate(context) {
     vscode.commands.registerCommand('claudeSkills.openConfig', async () => {
       const doc = await vscode.workspace.openTextDocument(userConfig.CONFIG_PATH);
       vscode.window.showTextDocument(doc);
+    }),
+    vscode.commands.registerCommand('claudeSkills.showAchievements', async () => {
+      await vscode.commands.executeCommand('workbench.view.extension.claudeSkillsPanel');
+      for (const v of provider.views) v.webview.postMessage({ type: 'showAchievements' });
+    }),
+    vscode.commands.registerCommand('claudeSkills.showWeeklyReport', async () => {
+      await vscode.commands.executeCommand('workbench.view.extension.claudeSkillsPanel');
+      for (const v of provider.views) v.webview.postMessage({ type: 'showWeeklyReport' });
     })
   );
+
+  // Global quick-slot commands (user can bind to keybindings.json)
+  for (let i = 0; i < 6; i++) {
+    const slotIndex = i;
+    context.subscriptions.push(
+      vscode.commands.registerCommand(`claudeSkills.quickSlot${slotIndex + 1}`, async () => {
+        const meta = userConfig.getMeta();
+        const name = meta.quickbar && meta.quickbar[slotIndex];
+        if (!name) {
+          vscode.window.showInformationMessage(`Quick Slot ${slotIndex + 1} 비어있음`);
+          return;
+        }
+        await vscode.env.clipboard.writeText('/' + name);
+        const result = userConfig.recordUsage(name);
+        vscode.window.setStatusBarMessage(`Copied: /${name}`, 2000);
+        for (const v of provider.views) {
+          v.webview.postMessage({ type: 'usageRecorded', name, ...result });
+        }
+        clearTimeout(provider._copyRefreshTimer);
+        provider._copyRefreshTimer = setTimeout(() => provider.refresh(), 1200);
+      })
+    );
+  }
 
   // Auto-refresh when SKILL.md changes
   const home = os.homedir();
