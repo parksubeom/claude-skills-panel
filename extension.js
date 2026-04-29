@@ -137,8 +137,15 @@ const escapeHtml = (s) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+function renderStars(level) {
+  const filled = '★'.repeat(level);
+  const empty = '☆'.repeat(5 - level);
+  return `<span class="stars lv${level}">${filled}${empty}</span>`;
+}
+
 function renderHtml(webview, skills) {
   const cfg = userConfig.read();
+  const meta = userConfig.getMeta();
   const enriched = skills.map((s) => userConfig.applyOverrides(s, cfg));
 
   const grouped = {};
@@ -147,6 +154,12 @@ function renderHtml(webview, skills) {
     grouped[s.group].push(s);
   }
   const order = ['user', 'project', 'plugin'];
+
+  // Recently used: top 6 by lastUsed (excludes hidden)
+  const recents = enriched
+    .filter((s) => !s.hidden && s.usage.lastUsed)
+    .sort((a, b) => new Date(b.usage.lastUsed) - new Date(a.usage.lastUsed))
+    .slice(0, 6);
 
   const pixelUriFor = (name) => {
     const file = PIXEL_MANIFEST[name];
@@ -188,6 +201,8 @@ function renderHtml(webview, skills) {
           const desc = escapeHtml(s.note || s.description);
           const aliased = s.label !== s.aliasOriginal;
           const kindBadge = s.kind === 'command' ? '<span class="kind-badge cmd">cmd</span>' : '';
+          const starsHtml = s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>';
+          const lvBadge = s.level > 0 ? `<span class="lv-badge lv${s.level}">LV.${s.level}</span>` : '';
           return `
             <button class="skill"
               data-name="${original}"
@@ -195,15 +210,23 @@ function renderHtml(webview, skills) {
               data-alias="${escapeHtml(s.label)}"
               data-note="${escapeHtml(s.note)}"
               data-hidden="${s.hidden ? '1' : '0'}"
-              data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}">
+              data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
+              data-count="${s.usage.count}"
+              data-last="${s.usage.lastUsed || ''}"
+              data-level="${s.level}">
               ${kindBadge}
+              ${lvBadge}
               <span class="edit-btn" title="편집">✎</span>
               ${iconHtml}
               <div class="skill-name">${label}</div>
               ${aliased ? `<div class="skill-original">/${original}</div>` : ''}
+              ${starsHtml}
               <div class="hover-card">
                 <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
                 <div class="hover-desc">${desc || '<i>설명 없음</i>'}</div>
+                <div class="hover-meta">
+                  ${s.usage.count ? `사용 ${s.usage.count}회 · LV.${s.level}` : '<i>아직 사용 안함</i>'}
+                </div>
                 <div class="hover-hint">클릭 → /${original} 복사</div>
               </div>
             </button>`;
@@ -221,6 +244,56 @@ function renderHtml(webview, skills) {
         </section>`;
     })
     .join('');
+
+  // Recently used section (pinned at top)
+  const renderCardCompact = (s) => {
+    const userUri = userIconUriFor(s);
+    const pngUri = userUri || pixelUriFor(s.name) || defaultIconUri;
+    const iconHtml = pngUri
+      ? `<img class="skill-icon-img${userUri ? ' user-icon' : ''}" src="${pngUri}" alt="${escapeHtml(s.name)}" />`
+      : `<div class="skill-icon">${pickIcon(s)}</div>`;
+    const label = escapeHtml(s.label);
+    const original = escapeHtml(s.aliasOriginal);
+    const desc = escapeHtml(s.note || s.description);
+    const aliased = s.label !== s.aliasOriginal;
+    const lvBadge = s.level > 0 ? `<span class="lv-badge lv${s.level}">LV.${s.level}</span>` : '';
+    const kindBadge = s.kind === 'command' ? '<span class="kind-badge cmd">cmd</span>' : '';
+    return `
+      <button class="skill"
+        data-name="${original}"
+        data-file="${escapeHtml(s.file)}"
+        data-alias="${escapeHtml(s.label)}"
+        data-note="${escapeHtml(s.note)}"
+        data-hidden="0"
+        data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
+        data-count="${s.usage.count}"
+        data-last="${s.usage.lastUsed || ''}"
+        data-level="${s.level}">
+        ${kindBadge}
+        ${lvBadge}
+        <span class="edit-btn" title="편집">✎</span>
+        ${iconHtml}
+        <div class="skill-name">${label}</div>
+        ${s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>'}
+        <div class="hover-card">
+          <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
+          <div class="hover-desc">${desc || '<i>설명 없음</i>'}</div>
+          <div class="hover-meta">사용 ${s.usage.count}회 · LV.${s.level}</div>
+          <div class="hover-hint">클릭 → /${original} 복사</div>
+        </div>
+      </button>`;
+  };
+  const recentSection = recents.length
+    ? `<section class="group recent-group">
+        <header>
+          <span class="group-icon">⏱</span>
+          <h3>최근 사용</h3>
+          <span class="sub">(top ${recents.length})</span>
+          <span class="group-line"></span>
+        </header>
+        <div class="grid">${recents.map(renderCardCompact).join('')}</div>
+      </section>`
+    : '';
 
   // Hidden skills section (only visible in edit mode)
   const hiddenSkills = enriched.filter((s) => s.hidden);
@@ -255,44 +328,118 @@ function renderHtml(webview, skills) {
       </section>`
     : '';
 
+  const csp = webview.cspSource;
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp} https: data:; style-src ${csp} 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'unsafe-inline'; connect-src 'none';" />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DotGothic16&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: var(--vscode-panel-background, #1e1e1e);
-    --fg: var(--vscode-foreground, #d4d4d4);
-    --muted: var(--vscode-descriptionForeground, #888);
+    --bg: #0e1018;
+    --bg-2: #161a26;
+    --fg: #e4e7ed;
+    --muted: #8a93a6;
     --frame: #5a6273;
     --frame-strong: #2c3140;
-    --tile-bg: var(--vscode-editorWidget-background, #252b3a);
-    --tile-bg-2: #1a1f2c;
-    --hover: var(--vscode-list-hoverBackground);
+    --tile-bg: #1f2533;
+    --tile-bg-2: #161a26;
+    --hover: rgba(125, 211, 252, 0.08);
     --accent: #7dd3fc;
     --accent-2: #f59e0b;
     --good: #22c55e;
     --bad: #ef4444;
+    --magenta: #c084fc;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     padding: 14px;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-family: 'DotGothic16', 'Press Start 2P', 'JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', monospace;
     color: var(--fg);
-    background: var(--bg);
+    background:
+      /* vignette */
+      radial-gradient(ellipse at center, transparent 0%, transparent 60%, rgba(0,0,0,0.5) 100%),
+      /* dot grid */
+      radial-gradient(circle, rgba(125, 211, 252, 0.06) 1px, transparent 1px) 0 0/16px 16px,
+      var(--bg);
+    background-attachment: fixed;
     font-size: 12px;
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
+    font-smoothing: never;
+    text-rendering: geometricPrecision;
+    overflow-x: hidden;
+    position: relative;
+  }
+  /* CRT scanlines (subtle) */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.18) 3px,
+      rgba(0, 0, 0, 0.18) 3px
+    );
+    opacity: 0.6;
+    mix-blend-mode: multiply;
+  }
+  body.no-scanlines::before { display: none; }
+  /* CRT corner curvature */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 998;
+    background: radial-gradient(ellipse at center, transparent 70%, rgba(0,0,0,0.35) 100%);
   }
   .toolbar {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    margin-bottom: 14px;
-    padding: 4px 6px;
-    border: 2px solid var(--frame);
-    border-radius: 6px;
+    margin-bottom: 16px;
+    padding: 4px 8px;
+    border: 3px solid var(--accent);
+    border-radius: 0;
     background: var(--tile-bg-2);
-    box-shadow: inset 0 0 0 1px var(--frame-strong);
+    box-shadow:
+      inset 0 0 0 1px #000,
+      0 0 0 1px var(--frame-strong),
+      0 4px 0 0 rgba(0, 0, 0, 0.4);
+    clip-path: polygon(
+      0 6px, 6px 0,
+      calc(100% - 6px) 0, 100% 6px,
+      100% calc(100% - 6px), calc(100% - 6px) 100%,
+      6px 100%, 0 calc(100% - 6px)
+    );
+  }
+  .sound-toggle, .scanlines-toggle {
+    all: unset;
+    cursor: pointer;
+    width: 24px; height: 24px;
+    border: 2px solid var(--frame);
+    background: var(--tile-bg);
+    color: var(--accent);
+    font-size: 12px;
+    text-align: center;
+    line-height: 20px;
+    transition: all 0.1s;
+    flex-shrink: 0;
+  }
+  .sound-toggle:hover, .scanlines-toggle:hover {
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+  }
+  .sound-toggle.off, .scanlines-toggle.off {
+    color: var(--muted);
+    border-color: var(--frame-strong);
   }
   .toolbar::before { content: '🔍'; font-size: 14px; padding-left: 2px; }
   .bracket-l, .bracket-r { color: var(--accent); font-weight: 700; user-select: none; }
@@ -312,7 +459,14 @@ function renderHtml(webview, skills) {
     display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
   }
   .group .group-icon { font-size: 16px; }
-  .group h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+  .group h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-shadow: 0 0 6px rgba(125, 211, 252, 0.4);
+  }
   .group .sub { color: var(--muted); font-size: 11px; }
   .group .group-line {
     flex: 1; height: 1px;
@@ -325,6 +479,23 @@ function renderHtml(webview, skills) {
     grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
     gap: 10px;
   }
+  /* card entrance animation */
+  @keyframes card-in {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-2px, 1px); }
+    40% { transform: translate(2px, -1px); }
+    60% { transform: translate(-1px, 2px); }
+    80% { transform: translate(1px, -2px); }
+  }
+  @keyframes sparkle {
+    0% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.5); }
+  }
   .skill {
     all: unset;
     cursor: pointer;
@@ -333,26 +504,66 @@ function renderHtml(webview, skills) {
     align-items: center;
     gap: 6px;
     padding: 12px 6px 10px;
-    border: 2px solid var(--frame);
-    border-radius: 6px;
+    border: 3px solid var(--frame);
     background: linear-gradient(180deg, var(--tile-bg) 0%, var(--tile-bg-2) 100%);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 2px 0 0 var(--frame-strong);
-    transition: transform 0.06s, border-color 0.12s, box-shadow 0.12s;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 2px 2px 0 0 rgba(255, 255, 255, 0.05),
+      inset -2px -2px 0 0 rgba(0, 0, 0, 0.4),
+      0 3px 0 0 var(--frame-strong);
+    transition: transform 0.08s, border-color 0.12s;
     text-align: center;
     position: relative;
+    /* 8-bit chamfer corners */
+    clip-path: polygon(
+      0 5px, 5px 0,
+      calc(100% - 5px) 0, 100% 5px,
+      100% calc(100% - 5px), calc(100% - 5px) 100%,
+      5px 100%, 0 calc(100% - 5px)
+    );
+    animation: card-in 0.3s ease-out backwards;
   }
+  .skill:nth-child(1) { animation-delay: 0.02s; }
+  .skill:nth-child(2) { animation-delay: 0.04s; }
+  .skill:nth-child(3) { animation-delay: 0.06s; }
+  .skill:nth-child(4) { animation-delay: 0.08s; }
+  .skill:nth-child(5) { animation-delay: 0.10s; }
+  .skill:nth-child(6) { animation-delay: 0.12s; }
+  .skill:nth-child(n+7) { animation-delay: 0.14s; }
   .skill:hover {
     border-color: var(--accent);
+    transform: translateY(-2px);
     box-shadow:
       inset 0 0 0 1px rgba(125, 211, 252, 0.18),
-      0 2px 0 0 var(--frame-strong),
-      0 0 8px rgba(125, 211, 252, 0.25);
+      inset 2px 2px 0 0 rgba(125, 211, 252, 0.1),
+      inset -2px -2px 0 0 rgba(0, 0, 0, 0.4),
+      0 5px 0 0 var(--frame-strong),
+      0 0 16px rgba(125, 211, 252, 0.4);
     z-index: 5;
   }
   .skill:active { transform: translateY(1px); }
   .skill.copied {
     border-color: var(--good);
-    box-shadow: 0 2px 0 0 #14532d, 0 0 10px rgba(34, 197, 94, 0.4);
+    animation: shake 0.3s;
+    box-shadow:
+      0 3px 0 0 #14532d,
+      0 0 24px rgba(34, 197, 94, 0.6),
+      inset 0 0 12px rgba(34, 197, 94, 0.2);
+  }
+  /* sparkle on hover */
+  .skill::before {
+    content: '✦';
+    position: absolute;
+    color: var(--accent);
+    font-size: 12px;
+    top: 8px;
+    right: 32px;
+    opacity: 0;
+    pointer-events: none;
+    text-shadow: 0 0 4px var(--accent);
+  }
+  .skill:hover::before {
+    animation: sparkle 0.6s ease-out;
   }
   .skill.ghost { opacity: 0.55; filter: grayscale(0.4); }
   .skill-icon { font-size: 32px; line-height: 1; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); }
@@ -368,6 +579,77 @@ function renderHtml(webview, skills) {
     letter-spacing: 0.2px;
   }
   .skill-original { font-size: 9px; color: var(--muted); margin-top: -3px; }
+  .stars {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 1;
+    margin-top: 2px;
+    user-select: none;
+    text-shadow: 0 0 4px currentColor;
+  }
+  .stars.lv0 { color: var(--frame); text-shadow: none; }
+  .stars.lv1 { color: #94a3b8; }
+  .stars.lv2 { color: var(--good); }
+  .stars.lv3 { color: var(--accent); }
+  .stars.lv4 { color: var(--magenta); }
+  .stars.lv5 { color: var(--accent-2); }
+  .lv-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 4px;
+    background: var(--frame-strong);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    letter-spacing: 0.4px;
+    line-height: 1.2;
+    z-index: 4;
+  }
+  .lv-badge.lv1 { color: #94a3b8; border-color: #94a3b8; }
+  .lv-badge.lv2 { color: var(--good); border-color: var(--good); }
+  .lv-badge.lv3 { color: var(--accent); border-color: var(--accent); }
+  .lv-badge.lv4 { color: var(--magenta); border-color: var(--magenta); }
+  .lv-badge.lv5 { color: var(--accent-2); border-color: var(--accent-2); box-shadow: 0 0 6px var(--accent-2); }
+  .sort-group { display: flex; gap: 2px; }
+  .sort-btn {
+    all: unset;
+    cursor: pointer;
+    width: 24px; height: 24px;
+    border: 2px solid var(--frame);
+    background: var(--tile-bg);
+    color: var(--muted);
+    text-align: center;
+    line-height: 20px;
+    font-size: 12px;
+    transition: all 0.1s;
+  }
+  .sort-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .sort-btn.active { color: var(--accent-2); border-color: var(--accent-2); background: var(--frame-strong); }
+  .recent-group { margin-bottom: 22px; }
+  .recent-group .grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .footer-streak, .footer-total {
+    color: var(--accent-2);
+    font-weight: 600;
+    text-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  }
+  .hover-meta {
+    color: var(--accent-2);
+    font-size: 10px;
+    margin-bottom: 4px;
+    border-top: 1px dashed #374151;
+    padding-top: 4px;
+  }
+  /* level-up celebration */
+  @keyframes level-up {
+    0% { transform: scale(1); }
+    20% { transform: scale(1.15); filter: brightness(1.5); }
+    40% { transform: scale(0.95); }
+    100% { transform: scale(1); filter: brightness(1); }
+  }
+  .skill.leveled-up { animation: level-up 0.6s ease-out; border-color: var(--accent-2) !important; }
   .kind-badge {
     position: absolute;
     top: 4px;
@@ -561,23 +843,32 @@ function renderHtml(webview, skills) {
   .footer .sep { opacity: 0.5; }
   .toast {
     position: fixed;
-    bottom: 14px;
+    bottom: 18px;
     left: 50%;
-    transform: translateX(-50%);
-    background: var(--frame-strong);
-    color: #fff;
-    padding: 6px 14px;
-    border: 2px solid var(--accent);
-    border-radius: 4px;
+    transform: translateX(-50%) translateY(8px);
+    background: #0b0d12;
+    color: var(--accent);
+    padding: 8px 18px;
+    border: 3px solid var(--accent);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 400;
     opacity: 0;
-    transition: opacity 0.18s;
+    transition: opacity 0.2s, transform 0.2s;
     pointer-events: none;
-    box-shadow: 0 2px 0 0 #000;
-    z-index: 300;
+    box-shadow:
+      inset 0 0 0 1px #000,
+      0 4px 0 #000,
+      0 0 18px rgba(125, 211, 252, 0.5);
+    z-index: 1000;
+    letter-spacing: 0.5px;
+    clip-path: polygon(
+      0 6px, 6px 0,
+      calc(100% - 6px) 0, 100% 6px,
+      100% calc(100% - 6px), calc(100% - 6px) 100%,
+      6px 100%, 0 calc(100% - 6px)
+    );
   }
-  .toast.show { opacity: 1; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .empty { color: var(--muted); text-align: center; padding: 24px; }
 </style>
 </head>
@@ -586,12 +877,19 @@ function renderHtml(webview, skills) {
     <span class="bracket-l">[</span>
     <input class="search" placeholder="검색창" id="search" />
     <span class="bracket-r">]</span>
+    <div class="sort-group" role="tablist" aria-label="정렬">
+      <button class="sort-btn active" data-sort="default" title="기본 정렬">☷</button>
+      <button class="sort-btn" data-sort="recent" title="최근 사용">⏱</button>
+      <button class="sort-btn" data-sort="usage" title="자주 사용">★</button>
+    </div>
+    <button class="sound-toggle" id="sound-toggle" title="사운드 on/off">♪</button>
+    <button class="scanlines-toggle" id="scanlines-toggle" title="CRT 효과 on/off">▦</button>
   </div>
-  <div id="content">${sections + hiddenSection || '<div class="empty">스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.</div>'}</div>
+  <div id="content">${recentSection + sections + hiddenSection || '<div class="empty">스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.</div>'}</div>
   <div class="footer">
-    <span>🏁 Finish</span>
+    <span class="footer-streak" id="footer-streak">${meta.streak.days > 0 ? `🔥 ${meta.streak.days}일` : '🔥 0일'}</span>
     <span class="sep">|</span>
-    <span>🪄 skills</span>
+    <span class="footer-total" id="footer-total">📊 ${meta.totalCopies}회</span>
     <span class="sep">|</span>
     <span id="footer-hint">클릭 → 복사 · 우클릭 → SKILL.md · ✎ → 편집</span>
   </div>
@@ -631,6 +929,66 @@ function renderHtml(webview, skills) {
 const vscode = acquireVsCodeApi();
 const search = document.getElementById('search');
 const toast = document.getElementById('toast');
+const soundBtn = document.getElementById('sound-toggle');
+const scanlinesBtn = document.getElementById('scanlines-toggle');
+
+// ---- Game state (persisted in localStorage of webview) ----
+const STATE = (() => {
+  let s;
+  try { s = JSON.parse(localStorage.getItem('csp-game-state') || '{}'); } catch { s = {}; }
+  return Object.assign({ sound: true, scanlines: true }, s);
+})();
+function saveState() { localStorage.setItem('csp-game-state', JSON.stringify(STATE)); }
+
+if (!STATE.scanlines) document.body.classList.add('no-scanlines');
+if (!STATE.sound) soundBtn.classList.add('off');
+if (!STATE.scanlines) scanlinesBtn.classList.add('off');
+
+// ---- 8-bit Web Audio ----
+let audioCtx = null;
+function ac() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(opts) {
+  if (!STATE.sound) return;
+  const { freq = 440, duration = 0.08, type = 'square', vol = 0.06, slide = 0 } = opts || {};
+  try {
+    const ctx = ac();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    if (slide) {
+      osc.frequency.exponentialRampToValueAtTime(freq + slide, ctx.currentTime + duration);
+    }
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  } catch {}
+}
+function sfxHover() { beep({ freq: 800, duration: 0.04, vol: 0.025 }); }
+function sfxClick() { beep({ freq: 660, duration: 0.06, slide: -200, vol: 0.05 }); }
+function sfxCopy() {
+  beep({ freq: 880, duration: 0.06, vol: 0.05 });
+  setTimeout(() => beep({ freq: 1320, duration: 0.08, vol: 0.05 }), 60);
+}
+function sfxOpen() { beep({ freq: 520, duration: 0.05, slide: 200, vol: 0.04 }); }
+
+soundBtn.addEventListener('click', () => {
+  STATE.sound = !STATE.sound;
+  soundBtn.classList.toggle('off', !STATE.sound);
+  saveState();
+  if (STATE.sound) sfxCopy();
+});
+scanlinesBtn.addEventListener('click', () => {
+  STATE.scanlines = !STATE.scanlines;
+  scanlinesBtn.classList.toggle('off', !STATE.scanlines);
+  document.body.classList.toggle('no-scanlines', !STATE.scanlines);
+  saveState();
+});
 const modalBg = document.getElementById('modal-bg');
 const mAlias = document.getElementById('m-alias');
 const mNote = document.getElementById('m-note');
@@ -712,7 +1070,78 @@ window.addEventListener('message', (e) => {
     pendingIconClear = false;
     setIconPreview(m.uri, m.size);
   }
+  if (m && m.type === 'usageRecorded') {
+    // Update card data attrs + stars, no full refresh
+    document.querySelectorAll('.skill[data-name="' + m.name.replace(/"/g, '\\\\"') + '"]').forEach((el) => {
+      const newCount = parseInt(el.dataset.count || '0', 10) + 1;
+      el.dataset.count = String(newCount);
+      el.dataset.last = new Date().toISOString();
+      const wasLevel = m.prevLevel;
+      const newLevel = m.nextLevel;
+      el.dataset.level = String(newLevel);
+      // refresh stars
+      const stars = el.querySelector('.stars');
+      if (stars) {
+        stars.className = 'stars lv' + newLevel;
+        stars.textContent = '★'.repeat(newLevel) + '☆'.repeat(5 - newLevel);
+      }
+      // refresh LV badge
+      let lvBadge = el.querySelector('.lv-badge');
+      if (newLevel > 0) {
+        if (!lvBadge) {
+          lvBadge = document.createElement('span');
+          lvBadge.className = 'lv-badge lv' + newLevel;
+          el.appendChild(lvBadge);
+        }
+        lvBadge.className = 'lv-badge lv' + newLevel;
+        lvBadge.textContent = 'LV.' + newLevel;
+      }
+      if (newLevel > wasLevel) {
+        el.classList.add('leveled-up');
+        setTimeout(() => el.classList.remove('leveled-up'), 700);
+        showToast('★ LEVEL UP! /' + m.name + ' LV.' + newLevel);
+        beep({ freq: 660, duration: 0.1, vol: 0.06 });
+        setTimeout(() => beep({ freq: 880, duration: 0.1, vol: 0.06 }), 100);
+        setTimeout(() => beep({ freq: 1100, duration: 0.15, vol: 0.06 }), 200);
+      }
+    });
+    // update footer
+    const streakEl = document.getElementById('footer-streak');
+    const totalEl = document.getElementById('footer-total');
+    if (streakEl) streakEl.textContent = '🔥 ' + m.streak + '일';
+    if (totalEl) totalEl.textContent = '📊 ' + m.totalCopies + '회';
+  }
 });
+
+// Sort
+const SORT = { mode: STATE.sort || 'default' };
+function applySort() {
+  const mode = SORT.mode;
+  document.querySelectorAll('.sort-btn').forEach((b) => b.classList.toggle('active', b.dataset.sort === mode));
+  document.querySelectorAll('.group:not(.recent-group):not(.hidden-group) .grid').forEach((grid) => {
+    const cards = [...grid.querySelectorAll('.skill')];
+    cards.sort((a, b) => {
+      if (mode === 'recent') {
+        return (b.dataset.last || '').localeCompare(a.dataset.last || '');
+      }
+      if (mode === 'usage') {
+        return parseInt(b.dataset.count || '0', 10) - parseInt(a.dataset.count || '0', 10);
+      }
+      return a.dataset.name.localeCompare(b.dataset.name);
+    });
+    cards.forEach((c) => grid.appendChild(c));
+  });
+}
+document.querySelectorAll('.sort-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    SORT.mode = btn.dataset.sort;
+    STATE.sort = SORT.mode;
+    saveState();
+    sfxClick();
+    applySort();
+  });
+});
+applySort();
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && modalBg.classList.contains('show')) closeModal();
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && modalBg.classList.contains('show')) {
@@ -721,20 +1150,24 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.querySelectorAll('.skill').forEach((el) => {
+  el.addEventListener('mouseenter', () => sfxHover());
   el.addEventListener('click', (e) => {
     if (e.target.classList.contains('edit-btn')) {
       e.stopPropagation();
+      sfxOpen();
       openEditModal(el);
       return;
     }
     const name = el.dataset.name;
     vscode.postMessage({ type: 'copy', name });
     el.classList.add('copied');
+    sfxCopy();
     setTimeout(() => el.classList.remove('copied'), 600);
-    showToast('복사됨: /' + name);
+    showToast('▶ /' + name);
   });
   el.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    sfxClick();
     vscode.postMessage({ type: 'open', file: el.dataset.file });
   });
 });
@@ -777,7 +1210,14 @@ class SkillsViewProvider {
     webviewView.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'copy' && msg.name) {
         await vscode.env.clipboard.writeText('/' + msg.name);
+        const result = userConfig.recordUsage(msg.name);
         vscode.window.setStatusBarMessage('Copied: /' + msg.name, 2000);
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'usageRecorded', name: msg.name, ...result });
+        }
+        // Defer full refresh so card animation finishes first; updates "최근 사용" section
+        clearTimeout(this._copyRefreshTimer);
+        this._copyRefreshTimer = setTimeout(() => this.refresh(), 1200);
       } else if (msg.type === 'open' && msg.file) {
         const doc = await vscode.workspace.openTextDocument(msg.file);
         vscode.window.showTextDocument(doc);
