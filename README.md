@@ -12,7 +12,11 @@ A pixel-art panel for **Claude Code** that lets you browse, search, and instantl
 
 ## Preview
 
-![Claude Code Skills Panel](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-main.png)
+### Activity Bar (narrow)
+![Claude Code Skills Panel — Sidebar](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-main.png)
+
+### Bottom Panel (wide)
+![Claude Code Skills Panel — Bottom Panel](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-bottom.png)
 
 ---
 
