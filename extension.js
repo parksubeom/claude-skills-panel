@@ -287,10 +287,27 @@ function renderHtml(webview, skills) {
 
   const userIconUriFor = (skill) => {
     const cfgEntry = (cfg.skills && cfg.skills[skill.name]) || {};
+    // 1. Custom upload
     const abs = userConfig.resolveIconPath(cfgEntry.iconPath);
-    if (!abs) return null;
-    return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
+    if (abs) return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
+    // 2. Spark preset chosen by user
+    if (cfgEntry.sparkIcon && PIXEL_DIR) {
+      const sparkAbs = path.join(PIXEL_DIR, 'spark', `${cfgEntry.sparkIcon}.png`);
+      if (fs.existsSync(sparkAbs)) return webview.asWebviewUri(vscode.Uri.file(sparkAbs)).toString();
+    }
+    return null;
   };
+
+  // Build spark preset list for modal
+  const sparkPresets = PIXEL_DIR
+    ? fs.readdirSync(path.join(PIXEL_DIR, 'spark')).filter(f => f.endsWith('.png'))
+        .map(f => {
+          const name = f.replace('.png', '');
+          const uri = webview.asWebviewUri(vscode.Uri.file(path.join(PIXEL_DIR, 'spark', f))).toString();
+          return { name, uri };
+        })
+    : [];
+  const sparkPresetsJson = escapeHtml(JSON.stringify(sparkPresets));
 
   const sections = order
     .filter((g) => grouped[g] && grouped[g].length)
@@ -320,6 +337,7 @@ function renderHtml(webview, skills) {
               data-note="${escapeHtml(s.note)}"
               data-hidden="${s.hidden ? '1' : '0'}"
               data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
+              data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
               data-count="${s.usage.count}"
               data-last="${s.usage.lastUsed || ''}"
               data-level="${s.level}">
@@ -375,6 +393,7 @@ function renderHtml(webview, skills) {
         data-note="${escapeHtml(s.note)}"
         data-hidden="0"
         data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
+        data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
         data-count="${s.usage.count}"
         data-last="${s.usage.lastUsed || ''}"
         data-level="${s.level}">
@@ -1400,6 +1419,37 @@ function renderHtml(webview, skills) {
   .btn:hover { border-color: var(--accent); }
   .btn-primary { background: var(--accent-2); color: #1a1f2c; border-color: #c2410c; font-weight: 600; }
   .btn-danger { color: var(--bad); border-color: var(--bad); }
+  .spark-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+    margin-top: 4px;
+    padding: 4px;
+    background: var(--tile-bg-2);
+    border: 1px solid var(--frame);
+    border-radius: 3px;
+  }
+  .spark-preset-btn {
+    all: unset;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    overflow: hidden;
+    transition: border-color 0.1s;
+    flex-shrink: 0;
+  }
+  .spark-preset-btn img {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    display: block;
+  }
+  .spark-preset-btn:hover { border-color: var(--accent); }
+  .spark-preset-btn.selected { border-color: var(--accent-2); box-shadow: 0 0 6px rgba(245,158,11,0.5); }
   .icon-row { display: flex; gap: 10px; align-items: stretch; margin-top: 4px; }
   .icon-preview {
     position: relative;
@@ -1515,7 +1565,7 @@ function renderHtml(webview, skills) {
       <input type="text" id="m-alias" placeholder="예: 오늘 시작" />
       <label>설명 메모(Note)</label>
       <textarea id="m-note" placeholder="이 스킬에 대한 개인 메모…"></textarea>
-      <label>커스텀 아이콘 <span class="hint">(권장 64×64 / 정사각형 PNG·SVG)</span></label>
+      <label>아이콘</label>
       <div class="icon-row">
         <div class="icon-preview" id="m-icon-preview">
           <div class="preview-empty">없음</div>
@@ -1526,6 +1576,8 @@ function renderHtml(webview, skills) {
           <button class="btn btn-danger" id="m-icon-clear" type="button">제거</button>
         </div>
       </div>
+      <label style="margin-top:8px;">Spark 프리셋 <span class="hint">(클릭으로 선택)</span></label>
+      <div class="spark-preset-grid" id="m-spark-grid" data-presets="${sparkPresetsJson}"></div>
       <div class="modal-row">
         <input type="checkbox" id="m-hidden" />
         <label for="m-hidden" style="margin: 0; font-size: 11px; color: var(--fg);">패널에서 숨기기</label>
@@ -1827,7 +1879,28 @@ function showToast(msg) {
 }
 
 let pendingIconClear = false;
+let pendingSparkIcon = null;
 const iconSizeEl = document.getElementById('m-icon-size');
+const sparkGrid = document.getElementById('m-spark-grid');
+
+// Build spark preset grid
+(function() {
+  let presets = [];
+  try { presets = JSON.parse(sparkGrid.dataset.presets || '[]'); } catch {}
+  sparkGrid.innerHTML = presets.map(p =>
+    '<button class="spark-preset-btn" data-name="' + p.name + '" title="' + p.name + '" type="button">' +
+    '<img src="' + p.uri + '" alt="' + p.name + '" /></button>'
+  ).join('');
+  sparkGrid.querySelectorAll('.spark-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sparkGrid.querySelectorAll('.spark-preset-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      pendingSparkIcon = btn.dataset.name;
+      pendingIconClear = false;
+      setIconPreview(btn.querySelector('img').src, '36×36');
+    });
+  });
+})();
 function setIconPreview(uri, sizeText) {
   const preview = document.getElementById('m-icon-preview');
   if (uri) {
@@ -1853,7 +1926,13 @@ function openEditModal(el) {
   mNote.value = el.dataset.note || '';
   mHidden.checked = el.dataset.hidden === '1';
   pendingIconClear = false;
+  pendingSparkIcon = null;
   setIconPreview(el.dataset.iconUri || '');
+  // Highlight currently selected spark preset if any
+  const currentSpark = el.dataset.sparkIcon || '';
+  sparkGrid.querySelectorAll('.spark-preset-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.name === currentSpark);
+  });
   modalBg.classList.add('show');
   setTimeout(() => mAlias.focus(), 50);
 }
@@ -1869,6 +1948,7 @@ document.getElementById('m-save').addEventListener('click', () => {
     note: mNote.value.trim(),
     hidden: mHidden.checked,
     clearIcon: pendingIconClear,
+    sparkIcon: pendingSparkIcon,
   });
   closeModal();
 });
@@ -2192,6 +2272,13 @@ class SkillsViewProvider {
             }
           }
           delete cfg.skills[msg.name].iconPath;
+          delete cfg.skills[msg.name].sparkIcon;
+        }
+        if (msg.sparkIcon) {
+          cfg.skills[msg.name].sparkIcon = msg.sparkIcon;
+          delete cfg.skills[msg.name].iconPath; // spark overrides upload
+        } else if (msg.sparkIcon === null && !msg.clearIcon) {
+          // keep existing sparkIcon if not explicitly clearing
         }
         if (Object.keys(cfg.skills[msg.name]).length === 0) delete cfg.skills[msg.name];
         userConfig.write(cfg);

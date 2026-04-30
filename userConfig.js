@@ -54,6 +54,7 @@ function applyOverrides(skill, cfg) {
     note: entry.note || '',
     hidden: !!entry.hidden,
     iconPath: entry.iconPath || null,
+    sparkIcon: entry.sparkIcon || null,
     aliasOriginal: skill.name,
     usage,
     level: levelFor(usage.count),
