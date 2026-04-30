@@ -291,6 +291,62 @@ function pluginCount(skills) {
   return set.size;
 }
 
+// Read installed_plugins.json into a Set of "name@marketplace" keys for
+// quick "is this plugin installed?" lookups in the marketplace browser.
+function loadInstalledPluginSet(home) {
+  const f = path.join(home, '.claude', 'plugins', 'installed_plugins.json');
+  const out = new Set();
+  if (!fs.existsSync(f)) return out;
+  try {
+    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+    for (const k of Object.keys(d.plugins || {})) out.add(k);
+  } catch {}
+  return out;
+}
+
+// Walk every configured marketplace under ~/.claude/plugins/marketplaces/
+// and aggregate every plugin entry into a flat list, annotated with installed state.
+function loadMarketplaceCatalog() {
+  const home = os.homedir();
+  const installed = loadInstalledPluginSet(home);
+  const root = path.join(home, '.claude', 'plugins', 'marketplaces');
+  const result = { marketplaces: [], plugins: [] };
+  if (!fs.existsSync(root)) return result;
+  let dirs;
+  try { dirs = fs.readdirSync(root, { withFileTypes: true }); }
+  catch { return result; }
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue;
+    const manifest = path.join(root, d.name, '.claude-plugin', 'marketplace.json');
+    if (!fs.existsSync(manifest)) continue;
+    let m;
+    try { m = JSON.parse(fs.readFileSync(manifest, 'utf8')); }
+    catch { continue; }
+    result.marketplaces.push({
+      id: d.name,
+      name: m.name || d.name,
+      description: m.description || '',
+      owner: (m.owner && m.owner.name) || '',
+      pluginCount: Array.isArray(m.plugins) ? m.plugins.length : 0,
+    });
+    if (!Array.isArray(m.plugins)) continue;
+    for (const p of m.plugins) {
+      if (!p || !p.name) continue;
+      const key = `${p.name}@${d.name}`;
+      result.plugins.push({
+        marketplace: d.name,
+        name: p.name,
+        description: p.description || '',
+        category: p.category || 'other',
+        author: (p.author && p.author.name) || '',
+        homepage: p.homepage || '',
+        installed: installed.has(key),
+      });
+    }
+  }
+  return result;
+}
+
 function buildWeeklyMarkdown(weekly) {
   const today = new Date().toISOString().slice(0, 10);
   const lines = [];
@@ -1604,6 +1660,72 @@ function renderHtml(webview, skills) {
   /* Hidden markdown textarea (used as a transport for copy/save) */
   .report-md-hidden { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+  /* Telemetry first-run banner */
+  .tlm-banner {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    background: var(--tile-bg);
+    border: 2px solid var(--accent);
+    color: var(--fg);
+    font-size: 11px;
+  }
+  .tlm-banner-text { flex: 1; }
+
+  /* Marketplace browser modal */
+  .modal-wide { max-width: 720px; }
+  .market-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .market-search {
+    flex: 1; min-width: 200px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 2px solid var(--frame);
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .market-toggle { display: flex; gap: 4px; align-items: center; font-size: 11px; color: var(--muted); }
+  .market-status { color: var(--muted); font-size: 10px; margin-bottom: 6px; }
+  .market-list {
+    max-height: 480px; overflow-y: auto;
+    display: grid; gap: 8px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 600px) {
+    .market-list { grid-template-columns: 1fr 1fr; }
+  }
+  .market-card {
+    background: var(--tile-bg-2);
+    border: 2px solid var(--frame-strong);
+    padding: 10px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .market-card.installed { border-color: var(--good); }
+  .market-name { font-weight: 700; color: var(--accent); font-size: 12px; }
+  .market-cat { color: var(--muted); font-weight: 400; font-size: 10px; }
+  .market-desc { color: #cbd5e1; font-size: 10px; line-height: 1.5; }
+  .market-meta { color: var(--muted); font-size: 9px; display: flex; gap: 8px; align-items: center; }
+  .market-meta code { background: var(--bg); padding: 2px 4px; }
+  .market-actions { display: flex; gap: 6px; align-items: center; margin-top: auto; }
+  .market-install-btn { padding: 4px 10px; font-size: 10px; }
+  .market-badge { color: var(--good); font-size: 10px; font-weight: 700; }
+  .market-link { color: var(--accent); font-size: 10px; text-decoration: none; cursor: pointer; }
+  .market-link:hover { color: var(--accent-2); text-decoration: underline; }
+
+  /* Settings modal */
+  .settings-section { margin-bottom: 14px; }
+  .settings-section label { display: block; font-weight: 700; color: var(--accent-2); margin-bottom: 4px; font-size: 11px; }
+  .settings-section .hint { margin-bottom: 6px; }
+  .settings-section textarea {
+    width: 100%; min-height: 90px;
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--frame-strong);
+    font-family: monospace;
+    font-size: 10px;
+    padding: 6px;
+    margin-bottom: 6px;
+  }
+
   /* Keyboard-focused card during search */
   .skill.keyfocus {
     outline: 2px solid var(--accent);
@@ -1920,6 +2042,12 @@ function renderHtml(webview, skills) {
 </style>
 </head>
 <body data-theme="${theme}">
+  ${(!cfg.meta || !cfg.meta.telemetry) ? `
+  <div class="tlm-banner" id="tlm-banner">
+    <span class="tlm-banner-text">${t('telemetry.banner')}</span>
+    <button class="btn btn-ghost" id="tlm-banner-on" type="button">${t('telemetry.allow')}</button>
+    <button class="btn btn-ghost" id="tlm-banner-off" type="button">${t('telemetry.deny')}</button>
+  </div>` : ''}
   <div class="toolbar">
     <div class="toolbar-search">
       <span class="bracket-l">[</span>
@@ -1935,6 +2063,8 @@ function renderHtml(webview, skills) {
       <button class="meta-btn" id="achv-btn" title="${t('toolbar.achievements')}">🏆</button>
       <button class="meta-btn" id="report-btn" title="${t('toolbar.weeklyReport')}">📊</button>
       <button class="meta-btn" id="groups-btn" title="${t('toolbar.groups')}">📁</button>
+      <button class="meta-btn" id="market-btn" title="${t('toolbar.marketplace')}">🛒</button>
+      <button class="meta-btn" id="settings-btn" title="${t('toolbar.settings')}">⚙</button>
       <button class="exec-mode-btn" id="exec-mode-btn" title="${t('toolbar.execMode')}">▶ Off</button>
       <button class="sound-toggle" id="sound-toggle" title="${t('toolbar.sound')}">♪</button>
       <button class="scanlines-toggle" id="scanlines-toggle" title="${t('toolbar.scanlines')}">▦</button>
@@ -2047,6 +2177,55 @@ function renderHtml(webview, skills) {
       </div>
       <div class="modal-actions">
         <button class="btn" id="groups-close">${t('modal.groups.close')}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="market-bg">
+    <div class="modal modal-wide">
+      <h4>${t('modal.market.title')}</h4>
+      <div class="hint" style="margin-bottom: 8px;">${t('modal.market.hint')}</div>
+      <div class="market-toolbar">
+        <input type="text" id="market-search" class="market-search" placeholder="${t('modal.market.searchPh')}" />
+        <select id="market-cat" class="m-select" style="width: auto; flex: 0 0 auto;"></select>
+        <label class="market-toggle">
+          <input type="checkbox" id="market-installed-only" />
+          ${t('modal.market.installedOnly')}
+        </label>
+      </div>
+      <div id="market-status" class="market-status">${t('modal.market.loading')}</div>
+      <div id="market-list" class="market-list"></div>
+      <div class="modal-actions">
+        <button class="btn" id="market-close">${t('modal.market.close')}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="settings-bg">
+    <div class="modal">
+      <h4>${t('modal.settings.title')}</h4>
+      <div class="settings-section">
+        <label>${t('modal.settings.export')}</label>
+        <div class="hint">${t('modal.settings.exportHint')}</div>
+        <button class="btn" id="settings-export">📋 ${t('modal.settings.exportBtn')}</button>
+      </div>
+      <div class="settings-section">
+        <label>${t('modal.settings.import')}</label>
+        <div class="hint">${t('modal.settings.importHint')}</div>
+        <textarea id="settings-import-text" placeholder='{"meta":{...},"skills":{...}}'></textarea>
+        <button class="btn btn-primary" id="settings-import-btn">${t('modal.settings.importBtn')}</button>
+      </div>
+      <div class="settings-section">
+        <label>${t('modal.settings.telemetry')}</label>
+        <div class="hint">${t('modal.settings.telemetryHint')}</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" data-telemetry="on" id="tlm-on">${t('modal.settings.telemetryOn')}</button>
+          <button class="btn" data-telemetry="off" id="tlm-off">${t('modal.settings.telemetryOff')}</button>
+        </div>
+        <div class="hint" id="tlm-status" style="margin-top:4px;"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="settings-close">${t('modal.settings.close')}</button>
       </div>
     </div>
   </div>
@@ -2174,6 +2353,7 @@ function renderHtml(webview, skills) {
 const vscode = acquireVsCodeApi();
 const STR = ${JSON.stringify(i18n.dict(locale))};
 const LOCALE = ${JSON.stringify(locale)};
+window.__telemetry = ${JSON.stringify((cfg.meta && cfg.meta.telemetry) || 'unset')};
 function t(key, vars) {
   let s = STR[key];
   if (s == null) s = key;
@@ -2562,6 +2742,17 @@ window.addEventListener('message', (e) => {
   if (m && m.type === 'showAchievements') achvBg.classList.add('show');
   if (m && m.type === 'showWeeklyReport') reportBg.classList.add('show');
   if (m && m.type === 'toast' && m.key) showToast(t(m.key, m.vars));
+  if (m && m.type === 'marketplaceCatalog') {
+    marketCatalog = m.catalog || { marketplaces: [], plugins: [] };
+    // Populate category filter
+    const cats = new Set(marketCatalog.plugins.map((p) => p.category).filter(Boolean));
+    if (marketCatSel) {
+      const opts = ['<option value="__all__">' + (STR['modal.market.allCats'] || 'All categories') + '</option>'];
+      [...cats].sort().forEach((c) => opts.push('<option value="' + c + '">' + c + '</option>'));
+      marketCatSel.innerHTML = opts.join('');
+    }
+    renderMarketList();
+  }
   if (m && m.type === 'usageRecorded') {
     // Update card data attrs + stars, no full refresh
     document.querySelectorAll('.skill[data-name="' + m.name.replace(/"/g, '\\\\"') + '"]').forEach((el) => {
@@ -2955,6 +3146,123 @@ search.addEventListener('keydown', (e) => {
 // Auto-focus the search bar when the panel mounts (cheap WX win).
 setTimeout(() => { try { search.focus(); } catch {} }, 100);
 
+// ---- Telemetry banner ----
+const tlmBanner = document.getElementById('tlm-banner');
+function setTelemetry(value) {
+  vscode.postMessage({ type: 'setTelemetry', value });
+  if (tlmBanner) tlmBanner.style.display = 'none';
+}
+const tlmOnBtn = document.getElementById('tlm-banner-on');
+const tlmOffBtn = document.getElementById('tlm-banner-off');
+if (tlmOnBtn) tlmOnBtn.addEventListener('click', () => setTelemetry('on'));
+if (tlmOffBtn) tlmOffBtn.addEventListener('click', () => setTelemetry('off'));
+
+// ---- Marketplace browser ----
+const marketBg = document.getElementById('market-bg');
+const marketBtn = document.getElementById('market-btn');
+const marketCloseBtn = document.getElementById('market-close');
+const marketList = document.getElementById('market-list');
+const marketStatus = document.getElementById('market-status');
+const marketSearchInput = document.getElementById('market-search');
+const marketCatSel = document.getElementById('market-cat');
+const marketInstalledOnly = document.getElementById('market-installed-only');
+let marketCatalog = null;
+function openMarketplace() {
+  marketBg.classList.add('show');
+  sfxOpen();
+  if (!marketCatalog) {
+    marketStatus.textContent = t('modal.market.loading');
+    vscode.postMessage({ type: 'loadMarketplaceCatalog' });
+  }
+}
+if (marketBtn) marketBtn.addEventListener('click', openMarketplace);
+if (marketCloseBtn) marketCloseBtn.addEventListener('click', () => marketBg.classList.remove('show'));
+if (marketBg) marketBg.addEventListener('click', (e) => { if (e.target === marketBg) marketBg.classList.remove('show'); });
+function renderMarketList() {
+  if (!marketCatalog) return;
+  const q = (marketSearchInput.value || '').trim().toLowerCase();
+  const cat = marketCatSel.value;
+  const installedOnly = marketInstalledOnly.checked;
+  const items = marketCatalog.plugins.filter((p) => {
+    if (installedOnly && !p.installed) return false;
+    if (cat && cat !== '__all__' && p.category !== cat) return false;
+    if (q) {
+      const hay = (p.name + ' ' + (p.description || '') + ' ' + (p.author || '') + ' ' + (p.category || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  // Installed first, then alphabetical
+  items.sort((a, b) => {
+    if (a.installed !== b.installed) return a.installed ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  marketStatus.textContent = t('modal.market.count', { shown: items.length, total: marketCatalog.plugins.length });
+  marketList.innerHTML = items.slice(0, 200).map((p) => {
+    const safeName = p.name.replace(/[<>"']/g, '');
+    const desc = (p.description || '').replace(/[<>"']/g, '').slice(0, 220);
+    const installCmd = '/plugin install ' + safeName + '@' + p.marketplace;
+    return '<div class="market-card ' + (p.installed ? 'installed' : '') + '">' +
+      '<div class="market-name">' + safeName + ' <span class="market-cat">' + (p.category || '') + '</span></div>' +
+      '<div class="market-desc">' + desc + '</div>' +
+      '<div class="market-meta">' + (p.author ? '<span>' + p.author.replace(/[<>"']/g, '') + '</span>' : '') +
+        ' <code>' + p.marketplace + '</code></div>' +
+      '<div class="market-actions">' +
+        (p.installed
+          ? '<span class="market-badge">✓ ' + t('modal.market.installed') + '</span>'
+          : '<button class="btn btn-primary market-install-btn" data-cmd="' + installCmd.replace(/"/g, '&quot;') + '" type="button">' + t('modal.market.install') + '</button>') +
+        (p.homepage ? '<a class="market-link" data-url="' + p.homepage.replace(/"/g, '&quot;') + '" href="#">' + t('modal.market.home') + '</a>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+  marketList.querySelectorAll('.market-install-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      vscode.postMessage({ type: 'runRawCommand', command: b.dataset.cmd });
+      sfxClick();
+      showToast(t('modal.market.installTriggered'));
+    });
+  });
+  marketList.querySelectorAll('.market-link').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      vscode.postMessage({ type: 'openExternal', url: a.dataset.url });
+    });
+  });
+}
+if (marketSearchInput) marketSearchInput.addEventListener('input', renderMarketList);
+if (marketCatSel) marketCatSel.addEventListener('change', renderMarketList);
+if (marketInstalledOnly) marketInstalledOnly.addEventListener('change', renderMarketList);
+
+// ---- Settings (export/import + telemetry) ----
+const settingsBg = document.getElementById('settings-bg');
+const settingsBtn = document.getElementById('settings-btn');
+if (settingsBtn) settingsBtn.addEventListener('click', () => { settingsBg.classList.add('show'); sfxOpen(); refreshTlmStatus(); });
+const settingsCloseBtn = document.getElementById('settings-close');
+if (settingsCloseBtn) settingsCloseBtn.addEventListener('click', () => settingsBg.classList.remove('show'));
+if (settingsBg) settingsBg.addEventListener('click', (e) => { if (e.target === settingsBg) settingsBg.classList.remove('show'); });
+const settingsExportBtn = document.getElementById('settings-export');
+if (settingsExportBtn) settingsExportBtn.addEventListener('click', () => {
+  vscode.postMessage({ type: 'exportSettings' });
+  sfxClick();
+});
+const settingsImportBtn = document.getElementById('settings-import-btn');
+const settingsImportText = document.getElementById('settings-import-text');
+if (settingsImportBtn) settingsImportBtn.addEventListener('click', () => {
+  const json = (settingsImportText.value || '').trim();
+  if (!json) return;
+  if (!confirm(t('modal.settings.importConfirm'))) return;
+  vscode.postMessage({ type: 'importSettings', json });
+  sfxClick();
+});
+function refreshTlmStatus() {
+  const el = document.getElementById('tlm-status');
+  if (el) el.textContent = t('modal.settings.telemetryCurrent', { value: STR['modal.settings.telemetry' + (window.__telemetry === 'on' ? 'On' : 'Off')] || (window.__telemetry || 'unset') });
+}
+const tlmOn2 = document.getElementById('tlm-on');
+const tlmOff2 = document.getElementById('tlm-off');
+if (tlmOn2) tlmOn2.addEventListener('click', () => { setTelemetry('on'); window.__telemetry = 'on'; refreshTlmStatus(); });
+if (tlmOff2) tlmOff2.addEventListener('click', () => { setTelemetry('off'); window.__telemetry = 'off'; refreshTlmStatus(); });
+
 // Footer external links (asWebviewUri/CSP can be picky; route through host)
 const footerRate = document.getElementById('footer-rate');
 const footerIssue = document.getElementById('footer-issue');
@@ -3013,6 +3321,40 @@ class SkillsViewProvider {
         this._quickRefreshTimer = setTimeout(() => this.refresh(), 150);
       } else if (msg.type === 'openExternal' && typeof msg.url === 'string') {
         vscode.env.openExternal(vscode.Uri.parse(msg.url));
+      } else if (msg.type === 'loadMarketplaceCatalog') {
+        const catalog = loadMarketplaceCatalog();
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'marketplaceCatalog', catalog });
+        }
+      } else if (msg.type === 'exportSettings') {
+        const cfg = userConfig.read();
+        const json = JSON.stringify(cfg, null, 2);
+        await vscode.env.clipboard.writeText(json);
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'toast', key: 'toast.settingsExported' });
+        }
+      } else if (msg.type === 'importSettings' && typeof msg.json === 'string') {
+        try {
+          const incoming = JSON.parse(msg.json);
+          if (!incoming || typeof incoming !== 'object') throw new Error('not object');
+          // Sanity: refuse anything that doesn't look like our config
+          if (!('skills' in incoming) && !('meta' in incoming)) throw new Error('not config');
+          userConfig.write(incoming);
+          this.refresh();
+          for (const v of this.views) {
+            v.webview.postMessage({ type: 'toast', key: 'toast.settingsImported' });
+          }
+        } catch (e) {
+          for (const v of this.views) {
+            v.webview.postMessage({ type: 'toast', key: 'toast.settingsImportFailed' });
+          }
+        }
+      } else if (msg.type === 'setTelemetry' && (msg.value === 'on' || msg.value === 'off')) {
+        const cfg = userConfig.read();
+        if (!cfg.meta) cfg.meta = {};
+        cfg.meta.telemetry = msg.value;
+        userConfig.write(cfg);
+        this.refresh();
       } else if (msg.type === 'runRawCommand' && typeof msg.command === 'string') {
         // Dispatched by onboarding "install superpowers" button.
         // Routes the literal slash command to wherever the user's exec mode

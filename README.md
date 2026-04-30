@@ -21,6 +21,10 @@ The fastest way to use Claude Code:
 
 ## Preview
 
+<!-- A 6–10s demo GIF is the highest-leverage thing you can add to a Marketplace listing. -->
+<!-- See docs/MAKING_DEMO_GIF.md for a recording recipe. -->
+<!-- ![Demo](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/demo.gif) -->
+
 ### Activity Bar (narrow)
 ![Claude Code Skills Panel — Sidebar](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/panel-main.png)
 

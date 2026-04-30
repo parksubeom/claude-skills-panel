@@ -2,6 +2,29 @@
 
 All notable changes to this extension are documented here.
 
+## [0.25.0] — 2026-05-01
+
+### Added — Plugin Marketplace Browser
+- New 🛒 toolbar button opens a modal that aggregates **every plugin from every marketplace you've added** (`/plugin marketplace add …`). Shows ~243 plugins from `claude-plugins-official` out of the box, plus any third-party marketplaces you register.
+- Each card shows name, category, description, author, marketplace, and homepage link.
+- Search by name/description/author/category, filter by category dropdown, "Installed only" toggle.
+- **One-click install** — fires `/plugin install <name>@<marketplace>` through your current execution mode (clipboard / auto-paste / terminal). Installed plugins show a green check instead.
+- Lazy-loaded — catalog isn't parsed until the modal is opened.
+
+### Added — Settings export/import
+- New ⚙ toolbar button.
+- Export: copies the full `~/.claude/skills-panel-config.json` to clipboard (aliases, groups, Quick Bar, achievements, theme, locale). Share via gist or sync via dotfiles.
+- Import: paste JSON, confirms before overwriting, validates shape.
+
+### Added — Telemetry opt-in
+- First-run banner above the toolbar asks once whether to allow anonymous usage counters. Disappears after the choice is recorded in `meta.telemetry`.
+- Toggle anytime from the Settings modal.
+- No personal data, no skill names — feature counters only. Hooks for backend dispatch are in place; activation is a separate change.
+
+### Added — Discoverability
+- `docs/MAKING_DEMO_GIF.md` — step-by-step guide for recording the canonical 10-second demo, with optimal ffmpeg/gifski pipeline and target size (820px / <600KB).
+- README has a placeholder line ready to uncomment once `docs/screenshots/demo.gif` exists.
+
 ## [0.24.0] — 2026-05-01
 
 ### Added — usability burst

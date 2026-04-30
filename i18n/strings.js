@@ -57,6 +57,8 @@ const STRINGS = {
     'toolbar.theme': 'Theme',
     'toolbar.locale': 'Language',
     'toolbar.groups': 'Manage groups',
+    'toolbar.marketplace': 'Browse plugins',
+    'toolbar.settings': 'Settings',
 
     // Footer
     'footer.streakDays': '{days}d',
@@ -103,6 +105,41 @@ const STRINGS = {
     'modal.groups.confirmDel': 'Delete this group? Skills will fall back to auto-grouping.',
     'modal.groups.close': 'Close',
 
+    // Marketplace browser
+    'modal.market.title': '🛒 Browse Plugins',
+    'modal.market.hint': 'Plugins from every marketplace you\'ve added (`/plugin marketplace add …`). Click Install to copy the slash command — it runs through your current execution mode.',
+    'modal.market.searchPh': 'Search name, description, author…',
+    'modal.market.installedOnly': 'Installed only',
+    'modal.market.loading': 'Loading catalog…',
+    'modal.market.count': 'Showing {shown} of {total}',
+    'modal.market.allCats': 'All categories',
+    'modal.market.installed': 'Installed',
+    'modal.market.install': 'Install',
+    'modal.market.installTriggered': 'Install command sent — run it in Claude Code',
+    'modal.market.home': 'Homepage',
+    'modal.market.close': 'Close',
+
+    // Settings
+    'modal.settings.title': '⚙ Settings',
+    'modal.settings.export': 'Export settings',
+    'modal.settings.exportHint': 'Copies your aliases, groups, Quick Bar, achievements, and theme to the clipboard as JSON. Share via gist or sync via dotfiles.',
+    'modal.settings.exportBtn': 'Copy as JSON',
+    'modal.settings.import': 'Import settings',
+    'modal.settings.importHint': 'Paste exported JSON below. This will replace your current configuration.',
+    'modal.settings.importBtn': 'Import',
+    'modal.settings.importConfirm': 'This replaces your current settings. Continue?',
+    'modal.settings.telemetry': 'Anonymous usage stats',
+    'modal.settings.telemetryHint': 'Help shape future features. No personal data, no skill names — just feature counters.',
+    'modal.settings.telemetryOn': 'Allow',
+    'modal.settings.telemetryOff': 'Disable',
+    'modal.settings.telemetryCurrent': 'Currently: {value}',
+    'modal.settings.close': 'Close',
+
+    // Telemetry banner (first-run)
+    'telemetry.banner': 'Help improve this extension? We collect anonymous feature usage counters — no skill names, no personal data.',
+    'telemetry.allow': 'Allow',
+    'telemetry.deny': 'No thanks',
+
     // Buddy / character sheet
     'modal.buddy.title': '🪄 Character Sheet',
     'modal.buddy.save': 'Save',
@@ -148,6 +185,9 @@ const STRINGS = {
     'toast.slotRegistered': 'Slot {key} → /{name}',
     'toast.weeklyCopied': '📋 Weekly report copied to clipboard',
     'toast.weeklySaved': '💾 Weekly report saved',
+    'toast.settingsExported': '📋 Settings copied to clipboard as JSON',
+    'toast.settingsImported': '✓ Settings imported',
+    'toast.settingsImportFailed': '✘ Import failed — invalid JSON',
 
     // Dialogs / status
     'dialog.iconOpenLabel': 'Pick Icon',
@@ -235,6 +275,8 @@ const STRINGS = {
     'toolbar.theme': '테마',
     'toolbar.locale': '언어',
     'toolbar.groups': '그룹 관리',
+    'toolbar.marketplace': '플러그인 탐색',
+    'toolbar.settings': '설정',
 
     'footer.streakDays': '{days}일',
     'footer.totalCopies': '{count}회',
@@ -277,6 +319,38 @@ const STRINGS = {
     'modal.groups.confirmDel': '이 그룹을 삭제할까요? 소속 스킬은 자동 그룹으로 돌아갑니다.',
     'modal.groups.close': '닫기',
 
+    'modal.market.title': '🛒 플러그인 탐색',
+    'modal.market.hint': '추가한 모든 마켓플레이스의 플러그인 목록입니다. Install 클릭 시 슬래시 커맨드가 현재 실행 방식대로 동작합니다.',
+    'modal.market.searchPh': '이름·설명·저자 검색…',
+    'modal.market.installedOnly': '설치된 것만',
+    'modal.market.loading': '카탈로그 불러오는 중…',
+    'modal.market.count': '{shown}개 표시 (전체 {total}개)',
+    'modal.market.allCats': '모든 카테고리',
+    'modal.market.installed': '설치됨',
+    'modal.market.install': '설치',
+    'modal.market.installTriggered': '설치 커맨드 전송됨 — Claude Code에서 실행하세요',
+    'modal.market.home': '홈페이지',
+    'modal.market.close': '닫기',
+
+    'modal.settings.title': '⚙ 설정',
+    'modal.settings.export': '설정 내보내기',
+    'modal.settings.exportHint': '별칭/그룹/Quick Bar/업적/테마 등 모든 설정을 JSON으로 클립보드에 복사. gist나 dotfiles로 공유.',
+    'modal.settings.exportBtn': 'JSON 복사',
+    'modal.settings.import': '설정 가져오기',
+    'modal.settings.importHint': '아래에 JSON을 붙여넣으세요. 현재 설정을 덮어씁니다.',
+    'modal.settings.importBtn': '가져오기',
+    'modal.settings.importConfirm': '현재 설정을 덮어씁니다. 계속하시겠어요?',
+    'modal.settings.telemetry': '익명 사용 통계',
+    'modal.settings.telemetryHint': '기능 개선에 활용됩니다. 개인 정보·스킬 이름 수집 없음 — 어떤 기능이 몇 번 쓰였는지만.',
+    'modal.settings.telemetryOn': '허용',
+    'modal.settings.telemetryOff': '거부',
+    'modal.settings.telemetryCurrent': '현재 상태: {value}',
+    'modal.settings.close': '닫기',
+
+    'telemetry.banner': '익스텐션 개선에 도움 주실래요? 기능 사용 카운터만 익명으로 수집합니다 — 스킬 이름·개인 정보 일절 없음.',
+    'telemetry.allow': '허용',
+    'telemetry.deny': '괜찮아요',
+
     'modal.buddy.title': '🪄 캐릭터 시트',
     'modal.buddy.save': '저장',
     'modal.buddy.close': '닫기',
@@ -318,6 +392,9 @@ const STRINGS = {
     'toast.slotRegistered': '슬롯 {key} 등록: /{name}',
     'toast.weeklyCopied': '📋 위클리 리포트 클립보드 복사',
     'toast.weeklySaved': '💾 위클리 리포트 저장 완료',
+    'toast.settingsExported': '📋 설정을 JSON으로 클립보드에 복사',
+    'toast.settingsImported': '✓ 설정 가져오기 완료',
+    'toast.settingsImportFailed': '✘ 가져오기 실패 — JSON 형식 확인',
 
     'dialog.iconOpenLabel': '아이콘 선택',
     'status.quickSlotEmpty': 'Quick Slot {n} 비어있음',
