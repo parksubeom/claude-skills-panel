@@ -5,9 +5,17 @@
 [![OpenVSX Downloads](https://img.shields.io/open-vsx/dt/parksubeom/claude-skills-panel?style=flat-square&label=Downloads&color=22c55e)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-> Built because memorizing slash commands is annoying. Turned into a tiny game along the way.
+> **Stop typing `/full-flow`, `/commit-prepare`, `/code-review` from memory.** This panel finds every Claude Code slash command on your machine and lets you fire it with one click — or one keystroke.
 
-A pixel-art panel for **Claude Code** that auto-discovers every slash command on your machine — your custom skills, project-level commands, and **all installed Claude Code plugins** (`/plugin install …`) — and lets you trigger them with one click. Character growth, achievements, and a free-roaming buddy included.
+The fastest way to use Claude Code:
+
+- 🔍 **Auto-discovers everything** — your `~/.claude/commands/`, project-level `.claude/commands/`, and every plugin you install via `/plugin install …` (superpowers, code-review, skill-creator, …)
+- ⚡ **One-click copy** (or auto-paste, or send-to-terminal) — pick the mode that fits your flow
+- 🔢 **Quick Bar with keys 1–6** — bind your top commands and never type them again
+- 🔎 **Fuzzy search + keyboard nav** — `↓` to skim, `Enter` to fire, `/name` to send any command (even ones you haven't memorized)
+- 🎨 **Three pixel themes** — Dark, Retro CRT, Gameboy LCD
+- 🏆 **Optional gamification** — character that levels up, 16 achievements, weekly report (export as Markdown)
+- 🌐 **English · 한국어** — switch with one click
 
 ---
 

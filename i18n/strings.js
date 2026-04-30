@@ -30,6 +30,19 @@ const STRINGS = {
     // Empty state
     'panel.empty': 'No skills found. Add SKILL.md under ~/.claude/skills.',
 
+    // Onboarding (shown when zero skills are discovered)
+    'onboarding.title': 'Welcome — let\'s wire up your skills',
+    'onboarding.sub': 'This panel auto-discovers every Claude Code slash command on your machine. Pick one of the paths below to get started.',
+    'onboarding.step1.title': 'Install a battle-tested plugin',
+    'onboarding.step1.desc': 'Superpowers ships ~50 slash commands for TDD, code review, debugging, and more — installed in one shot via the official marketplace.',
+    'onboarding.step1.cta': 'Click to copy & run',
+    'onboarding.step2.title': 'Add your own commands',
+    'onboarding.step2.desc': 'Drop a Markdown file under ~/.claude/commands/ and it shows up here automatically. SKILL.md format also works under any skills/ folder.',
+    'onboarding.step3.title': 'Make it yours',
+    'onboarding.step3.desc': 'Custom themes, custom groups, achievements, evolving buddy, Quick Bar with keyboard 1–6 — all opt-in, all togglable.',
+    'onboarding.foot': 'Once you have skills, this screen disappears and the panel takes over.',
+    'toast.onbInstallTriggered': 'Copied — paste in Claude Code to install',
+
     // Toolbar
     'toolbar.searchPh': 'Search',
     'toolbar.sort': 'Sort',
@@ -49,6 +62,8 @@ const STRINGS = {
     'footer.streakDays': '{days}d',
     'footer.totalCopies': '{count}×',
     'footer.hint': 'Click to copy · Right-click for source · ✎ to edit',
+    'footer.rate': 'Rate',
+    'footer.issue': 'Issue',
 
     // Edit modal
     'modal.edit.titleFormat': 'Edit Skill — /{name}',
@@ -195,6 +210,18 @@ const STRINGS = {
 
     'panel.empty': '스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.',
 
+    'onboarding.title': '시작하기 — 스킬 패널 준비',
+    'onboarding.sub': '이 패널은 머신에 있는 모든 Claude Code 슬래시 커맨드를 자동으로 찾아옵니다. 아래 중 하나로 시작하세요.',
+    'onboarding.step1.title': '검증된 플러그인 설치',
+    'onboarding.step1.desc': 'Superpowers는 TDD/코드리뷰/디버깅 등 50여 개의 슬래시 커맨드 패키지입니다. 공식 마켓플레이스에서 한 번에 설치.',
+    'onboarding.step1.cta': '클릭해서 복사 & 실행',
+    'onboarding.step2.title': '내 커맨드 직접 만들기',
+    'onboarding.step2.desc': '~/.claude/commands/ 아래에 마크다운 파일을 넣으면 자동으로 표시됩니다. SKILL.md 포맷도 어떤 skills/ 폴더에든 동작.',
+    'onboarding.step3.title': '내 스타일로 커스터마이즈',
+    'onboarding.step3.desc': '테마, 사용자 그룹, 업적, 진화하는 버디, 키보드 1–6 Quick Bar — 모두 선택형, 모두 토글 가능.',
+    'onboarding.foot': '스킬이 하나라도 잡히면 이 화면은 사라지고 본 패널이 뜹니다.',
+    'toast.onbInstallTriggered': '복사 완료 — Claude Code에 붙여넣어 설치하세요',
+
     'toolbar.searchPh': '검색창',
     'toolbar.sort': '정렬',
     'toolbar.sortDefault': '기본 정렬',
@@ -212,6 +239,8 @@ const STRINGS = {
     'footer.streakDays': '{days}일',
     'footer.totalCopies': '{count}회',
     'footer.hint': '클릭 → 복사 · 우클릭 → SKILL.md · ✎ → 편집',
+    'footer.rate': '평가',
+    'footer.issue': '이슈',
 
     'modal.edit.titleFormat': '스킬 편집 — /{name}',
     'modal.edit.title': '스킬 편집',

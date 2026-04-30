@@ -1604,6 +1604,96 @@ function renderHtml(webview, skills) {
   /* Hidden markdown textarea (used as a transport for copy/save) */
   .report-md-hidden { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+  /* Keyboard-focused card during search */
+  .skill.keyfocus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.15);
+    z-index: 5;
+  }
+
+  /* Onboarding empty state */
+  .onboarding {
+    padding: 24px 12px 8px;
+    text-align: center;
+    animation: onb-fade 0.4s ease;
+  }
+  @keyframes onb-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .onboarding-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    color: var(--accent);
+    margin: 0 0 8px;
+  }
+  .onboarding-sub {
+    color: var(--muted);
+    font-size: 11px;
+    margin: 0 auto 18px;
+    max-width: 520px;
+    line-height: 1.6;
+  }
+  .onboarding-cards {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    max-width: 720px;
+    margin: 0 auto 16px;
+  }
+  .onb-card {
+    position: relative;
+    text-align: left;
+    background: var(--tile-bg);
+    border: 2px solid var(--frame);
+    color: var(--fg);
+    padding: 14px 12px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .onb-card:not(.readonly):hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .onb-card.readonly { cursor: default; opacity: 0.85; }
+  .onb-num {
+    position: absolute;
+    top: -10px; left: 10px;
+    background: var(--bg);
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-size: 11px;
+  }
+  .onb-h { font-weight: 700; color: var(--accent-2); font-size: 12px; margin-top: 4px; }
+  .onb-d { font-size: 10px; color: var(--muted); line-height: 1.5; }
+  .onb-cmd {
+    background: var(--bg);
+    color: var(--accent);
+    padding: 4px 6px;
+    font-size: 9px;
+    border: 1px dashed var(--frame-strong);
+    word-break: break-all;
+    line-height: 1.4;
+  }
+  .onb-emoji { font-size: 18px; letter-spacing: 6px; margin-top: 4px; }
+  .onb-cta {
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+    margin-top: auto;
+    align-self: flex-end;
+  }
+  .onboarding-foot {
+    color: var(--muted);
+    font-size: 10px;
+    margin-top: 8px;
+  }
+
   /* Theme toggle button */
   .theme-toggle {
     background: transparent;
@@ -1787,8 +1877,17 @@ function renderHtml(webview, skills) {
     color: var(--muted);
     font-size: 11px;
     display: flex; gap: 12px; align-items: center;
+    flex-wrap: wrap;
   }
   .footer .sep { opacity: 0.5; }
+  .footer-spacer { flex: 1; }
+  .footer-link {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 10px;
+  }
+  .footer-link:hover { color: var(--accent-2); text-decoration: underline; }
   .toast {
     position: fixed;
     bottom: 18px;
@@ -1843,13 +1942,43 @@ function renderHtml(webview, skills) {
       <button class="locale-toggle" id="locale-toggle" title="${t('toolbar.locale')}">🌐 ${locale.toUpperCase()}</button>
     </div>
   </div>
-  <div id="content">${quickbarHtml + recentSection + sections + hiddenSection || `<div class="empty">${t('panel.empty')}</div>`}</div>
+  <div id="content">${(skills.length ? quickbarHtml + recentSection + sections + hiddenSection : '') || `
+    <section class="onboarding">
+      <h3 class="onboarding-title">${t('onboarding.title')}</h3>
+      <p class="onboarding-sub">${t('onboarding.sub')}</p>
+      <div class="onboarding-cards">
+        <button class="onb-card" id="onb-install" type="button">
+          <div class="onb-num">1</div>
+          <div class="onb-h">${t('onboarding.step1.title')}</div>
+          <div class="onb-d">${t('onboarding.step1.desc')}</div>
+          <code class="onb-cmd">/plugin install superpowers@claude-plugins-official</code>
+          <span class="onb-cta">${t('onboarding.step1.cta')} →</span>
+        </button>
+        <div class="onb-card readonly">
+          <div class="onb-num">2</div>
+          <div class="onb-h">${t('onboarding.step2.title')}</div>
+          <div class="onb-d">${t('onboarding.step2.desc')}</div>
+          <code class="onb-cmd">~/.claude/commands/&lt;name&gt;.md</code>
+        </div>
+        <div class="onb-card readonly">
+          <div class="onb-num">3</div>
+          <div class="onb-h">${t('onboarding.step3.title')}</div>
+          <div class="onb-d">${t('onboarding.step3.desc')}</div>
+          <span class="onb-emoji">🎨 📁 🏆 🐾</span>
+        </div>
+      </div>
+      <div class="onboarding-foot">${t('onboarding.foot')}</div>
+    </section>`}</div>
   <div class="footer">
     <span class="footer-streak" id="footer-streak">🔥 ${t('footer.streakDays', { days: meta.streak.days || 0 })}</span>
     <span class="sep">|</span>
     <span class="footer-total" id="footer-total">📊 ${t('footer.totalCopies', { count: meta.totalCopies })}</span>
     <span class="sep">|</span>
     <span id="footer-hint">${t('footer.hint')}</span>
+    <span class="footer-spacer"></span>
+    <a class="footer-link" id="footer-rate" href="#" title="${t('footer.rate')}">★ ${t('footer.rate')}</a>
+    <span class="sep">·</span>
+    <a class="footer-link" id="footer-issue" href="#" title="${t('footer.issue')}">${t('footer.issue')}</a>
   </div>
   <div class="toast" id="toast"></div>
   <div class="buddy-pet" id="buddy-pet" title="${escapeHtml(character.name)} — ${escapeHtml(character.stageName)}">
@@ -2703,17 +2832,139 @@ document.querySelectorAll('.skill').forEach((el) => {
   });
 });
 
-search.addEventListener('input', () => {
-  const q = search.value.trim().toLowerCase();
-  document.querySelectorAll('.skill').forEach((el) => {
-    const hay = (el.dataset.name + ' ' + (el.dataset.alias || '') + ' ' + (el.dataset.note || '')).toLowerCase();
-    el.style.display = !q || hay.includes(q) ? '' : 'none';
+// Onboarding install button
+const onbInstall = document.getElementById('onb-install');
+if (onbInstall) {
+  onbInstall.addEventListener('click', () => {
+    sfxClick();
+    vscode.postMessage({
+      type: 'runRawCommand',
+      command: '/plugin install superpowers@claude-plugins-official',
+    });
+    showToast(t('toast.onbInstallTriggered'));
+  });
+}
+
+// ---- Search: fuzzy scoring + keyboard navigation ----
+function fuzzyScore(q, hay) {
+  if (!q) return 0;
+  if (!hay) return 0;
+  q = q.toLowerCase();
+  hay = hay.toLowerCase();
+  if (hay === q) return 1000;
+  if (hay.startsWith(q)) return 500 + (1 - hay.length / 100);
+  const idx = hay.indexOf(q);
+  if (idx >= 0) return 200 - idx; // earlier match = higher score
+  // Subsequence match: every char in q appears in hay in order
+  let i = 0;
+  for (let j = 0; j < hay.length && i < q.length; j++) {
+    if (hay[j] === q[i]) i++;
+  }
+  if (i === q.length) return 50;
+  return 0;
+}
+
+function applySearch() {
+  const raw = search.value.trim();
+  // Slash-prefix mode: leading /name treats input as a literal command,
+  // even if no skill matches. Enter triggers the raw command directly.
+  search.dataset.rawSlash = raw.startsWith('/') ? raw : '';
+  const q = raw.replace(/^\\//, '').toLowerCase();
+  const cards = [...document.querySelectorAll('.skill')];
+  const scored = cards.map((el) => {
+    const name = el.dataset.name || '';
+    const alias = el.dataset.alias && el.dataset.alias !== name ? el.dataset.alias : '';
+    const note = el.dataset.note || '';
+    const score = q
+      ? Math.max(
+          fuzzyScore(q, alias) * 1.5,
+          fuzzyScore(q, name),
+          fuzzyScore(q, note) * 0.4
+        )
+      : 0;
+    return { el, score };
+  });
+  // Hide non-matches when searching
+  scored.forEach(({ el, score }) => {
+    el.style.display = !q || score > 0 ? '' : 'none';
+    el.dataset.score = String(score);
   });
   document.querySelectorAll('.group').forEach((g) => {
-    const cards = [...g.querySelectorAll('.skill')];
-    const visible = cards.some((el) => el.style.display !== 'none');
+    const visible = [...g.querySelectorAll('.skill')].some((el) => el.style.display !== 'none');
     g.style.display = visible ? '' : 'none';
   });
+  // Reorder visible cards within each grid by score (best first) when searching
+  if (q) {
+    document.querySelectorAll('.grid').forEach((grid) => {
+      const visible = [...grid.querySelectorAll('.skill')].filter((el) => el.style.display !== 'none');
+      visible.sort((a, b) => Number(b.dataset.score || 0) - Number(a.dataset.score || 0));
+      visible.forEach((el) => grid.appendChild(el));
+    });
+  }
+  // Reset focus index
+  searchFocusIdx = -1;
+  document.querySelectorAll('.skill.keyfocus').forEach((el) => el.classList.remove('keyfocus'));
+}
+search.addEventListener('input', applySearch);
+
+let searchFocusIdx = -1;
+function visibleCards() {
+  return [...document.querySelectorAll('.skill')].filter((el) => el.style.display !== 'none' && !el.closest('.hidden-group'));
+}
+function setSearchFocus(idx) {
+  const cards = visibleCards();
+  if (!cards.length) { searchFocusIdx = -1; return; }
+  if (idx < 0) idx = 0;
+  if (idx >= cards.length) idx = cards.length - 1;
+  searchFocusIdx = idx;
+  document.querySelectorAll('.skill.keyfocus').forEach((el) => el.classList.remove('keyfocus'));
+  cards[idx].classList.add('keyfocus');
+  cards[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+search.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setSearchFocus(searchFocusIdx + 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setSearchFocus(searchFocusIdx - 1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const slash = search.dataset.rawSlash;
+    if (slash) {
+      const name = slash.replace(/^\\//, '');
+      vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
+      sfxCopy();
+      const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
+      showToast('▶ ' + prefix + ': /' + name);
+      return;
+    }
+    const cards = visibleCards();
+    const target = cards[searchFocusIdx >= 0 ? searchFocusIdx : 0];
+    if (target) target.click();
+  } else if (e.key === 'Escape') {
+    if (search.value) {
+      search.value = '';
+      applySearch();
+    } else {
+      search.blur();
+    }
+  }
+});
+
+// Auto-focus the search bar when the panel mounts (cheap WX win).
+setTimeout(() => { try { search.focus(); } catch {} }, 100);
+
+// Footer external links (asWebviewUri/CSP can be picky; route through host)
+const footerRate = document.getElementById('footer-rate');
+const footerIssue = document.getElementById('footer-issue');
+if (footerRate) footerRate.addEventListener('click', (e) => {
+  e.preventDefault();
+  vscode.postMessage({ type: 'openExternal', url: 'https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel&ssr=false#review-details' });
+});
+if (footerIssue) footerIssue.addEventListener('click', (e) => {
+  e.preventDefault();
+  vscode.postMessage({ type: 'openExternal', url: 'https://github.com/parksubeom/claude-skills-panel/issues/new' });
 });
 </script>
 </body>
@@ -2760,6 +3011,31 @@ class SkillsViewProvider {
         userConfig.swapQuickbar(msg.from, msg.to);
         clearTimeout(this._quickRefreshTimer);
         this._quickRefreshTimer = setTimeout(() => this.refresh(), 150);
+      } else if (msg.type === 'openExternal' && typeof msg.url === 'string') {
+        vscode.env.openExternal(vscode.Uri.parse(msg.url));
+      } else if (msg.type === 'runRawCommand' && typeof msg.command === 'string') {
+        // Dispatched by onboarding "install superpowers" button.
+        // Routes the literal slash command to wherever the user's exec mode
+        // says: clipboard, auto-paste, or active terminal.
+        const text = msg.command;
+        await vscode.env.clipboard.writeText(text);
+        const cfg = userConfig.read();
+        const mode = (cfg.meta && cfg.meta.execMode) || 'paste';
+        if (mode === 'terminal') {
+          let term = vscode.window.activeTerminal;
+          if (!term) {
+            const named = vscode.window.terminals.find((tt) => /claude/i.test(tt.name));
+            term = named || vscode.window.terminals[0];
+          }
+          if (!term) term = vscode.window.createTerminal('Claude');
+          term.show(true);
+          term.sendText(text, true);
+        } else if (mode === 'auto') {
+          await tryFocus();
+          await new Promise((r) => setTimeout(r, 80));
+          osKeystroke(true);
+        }
+        // For 'paste' mode, the clipboard write above is enough — user pastes manually.
       } else if (msg.type === 'copyWeeklyMarkdown' && typeof msg.markdown === 'string') {
         await vscode.env.clipboard.writeText(msg.markdown);
         for (const v of this.views) {

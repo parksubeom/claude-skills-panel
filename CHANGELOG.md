@@ -2,6 +2,23 @@
 
 All notable changes to this extension are documented here.
 
+## [0.24.0] — 2026-05-01
+
+### Added — usability burst
+- **Onboarding empty state** — when no skills are discovered, three numbered guide cards appear. Card 1 ("Install superpowers") is one-click: copies the install command, then auto-paste / terminal-send according to your exec mode.
+- **Fuzzy search** — score-based ranking. Alias matches outweigh name matches (×1.5), note matches downweighted (×0.4). Subsequence matching catches typos.
+- **Keyboard navigation** — `↓` / `↑` from the search bar walks visible cards (with auto-scroll), `Enter` fires the focused card, `Esc` clears.
+- **Slash-prefix mode** — typing `/anything` in the search bar makes Enter dispatch that literal command, even when nothing matches. Lets you trigger commands you haven't memorized without leaving the panel.
+- **Auto-focus search** on panel mount.
+- **Footer links** — `★ Rate` (jumps to VS Marketplace review page) and `Issue` (jumps to GitHub Issues new).
+
+### Added — discoverability
+- **Marketplace listing rewrite** — `package.json` description now leads with the value prop ("The fastest way to use Claude Code slash commands…"). New keywords: `command-launcher`, `ai-coding`, `developer-experience`, `agent`, `agents`.
+- **README hero** — pain → solution opening, bulleted feature ladder.
+
+### Fixed
+- **CI publish workflow** — release job now checks out the repo so `gh release` can resolve git context (the v0.23.0 release-attach failure).
+
 ## [0.23.0] — 2026-05-01
 
 ### Added

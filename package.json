@@ -1,8 +1,8 @@
 {
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
-  "description": "Pixel-art panel for Claude Code — auto-discovers your skills, slash commands, and installed plugins. Aliases, Quick Bar, achievements, character growth. (English / 한국어)",
-  "version": "0.23.0",
+  "description": "The fastest way to use Claude Code slash commands. Auto-discovers every /command, /skill, and installed plugin (superpowers, code-review, …). One click to copy or run. Aliases, custom groups, Quick Bar (keys 1–6), achievements, themes, fuzzy search. English · 한국어.",
+  "version": "0.24.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",
@@ -33,8 +33,10 @@
     "slash-commands",
     "slash-command",
     "command-palette",
+    "command-launcher",
     "superpowers",
     "mcp",
+    "ai-coding",
     "pixel-art",
     "8-bit",
     "retro",
@@ -42,7 +44,10 @@
     "cursor",
     "productivity",
     "dotfiles",
-    "developer-tools"
+    "developer-experience",
+    "developer-tools",
+    "agent",
+    "agents"
   ],
   "galleryBanner": {
     "color": "#0f172a",
