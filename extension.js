@@ -115,7 +115,7 @@ function parseFrontmatter(text) {
   return out;
 }
 
-function walkSkills(rootDir, group, seen) {
+function walkSkills(rootDir, group, seen, extra) {
   const results = [];
   if (!fs.existsSync(rootDir)) return results;
   const stack = [rootDir];
@@ -147,6 +147,7 @@ function walkSkills(rootDir, group, seen) {
               description: fm.description || '',
               iconOverride: fm.icon || null,
               file: full,
+              ...(extra || {}),
             });
           }
         } catch {}
@@ -171,6 +172,7 @@ function walkSkills(rootDir, group, seen) {
               description: fm.description || '',
               iconOverride: fm.icon || null,
               file: full,
+              ...(extra || {}),
             });
           }
         } catch {}
@@ -178,6 +180,67 @@ function walkSkills(rootDir, group, seen) {
     }
   }
   return results;
+}
+
+// Discover installed Claude Code plugins from ~/.claude/plugins/cache/.
+// Returns an array of { dir, group, plugin, marketplace } sources, one per
+// installed plugin version. Falls back to a single coarse source if the
+// expected layout isn't present (e.g. legacy installs).
+function discoverPluginSources(home) {
+  const cacheRoot = path.join(home, '.claude', 'plugins', 'cache');
+  if (!fs.existsSync(cacheRoot)) return [];
+  const sources = [];
+  let foundLayout = false;
+  let marketplaces;
+  try {
+    marketplaces = fs.readdirSync(cacheRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  for (const m of marketplaces) {
+    if (!m.isDirectory()) continue;
+    const mDir = path.join(cacheRoot, m.name);
+    let plugins;
+    try {
+      plugins = fs.readdirSync(mDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const p of plugins) {
+      if (!p.isDirectory()) continue;
+      const pDir = path.join(mDir, p.name);
+      let versions;
+      try {
+        versions = fs.readdirSync(pDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      // Only keep the most recently mtime'd version dir to avoid duplicates
+      const versionDirs = versions
+        .filter((v) => v.isDirectory())
+        .map((v) => {
+          const full = path.join(pDir, v.name);
+          let mtime = 0;
+          try { mtime = fs.statSync(full).mtimeMs; } catch {}
+          return { name: v.name, full, mtime };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+      if (!versionDirs.length) continue;
+      foundLayout = true;
+      const latest = versionDirs[0];
+      sources.push({
+        dir: latest.full,
+        group: 'plugin',
+        plugin: p.name,
+        marketplace: m.name,
+      });
+    }
+  }
+  // Fallback: if directory exists but layout looks unfamiliar, scan it whole
+  if (!foundLayout) {
+    sources.push({ dir: cacheRoot, group: 'plugin' });
+  }
+  return sources;
 }
 
 function loadAllSkills() {
@@ -193,14 +256,22 @@ function loadAllSkills() {
     sources.push({ dir: path.join(ws[0].uri.fsPath, '.claude', 'commands'), group: 'project' });
   }
   // All installed plugins (covers superpowers, code-review, frontend-design, etc.)
-  sources.push({ dir: path.join(home, '.claude', 'plugins', 'cache'), group: 'plugin' });
+  sources.push(...discoverPluginSources(home));
 
   const seen = new Set();
   const all = [];
-  for (const s of sources) all.push(...walkSkills(s.dir, s.group, seen));
+  for (const s of sources) {
+    const extra = {};
+    if (s.plugin) extra.plugin = s.plugin;
+    if (s.marketplace) extra.marketplace = s.marketplace;
+    all.push(...walkSkills(s.dir, s.group, seen, extra));
+  }
   all.sort((a, b) => {
     const order = { user: 0, project: 1, plugin: 2 };
     if (order[a.group] !== order[b.group]) return order[a.group] - order[b.group];
+    if (a.group === 'plugin' && a.plugin !== b.plugin) {
+      return String(a.plugin || '').localeCompare(String(b.plugin || ''));
+    }
     return a.name.localeCompare(b.name);
   });
   return all;
@@ -210,8 +281,45 @@ function loadAllSkills() {
 const GROUP_LABELS = {
   user: { labelKey: 'group.user.label', sub: '~/.claude/skills', emoji: '📁' },
   project: { labelKey: 'group.project.label', sub: '.claude/skills', emoji: '📂' },
-  plugin: { labelKey: 'group.plugin.label', sub: 'superpowers / etc.', emoji: '🧩' },
+  plugin: { labelKey: 'group.plugin.label', sub: '~/.claude/plugins', emoji: '🧩' },
 };
+
+// Distinct count of plugins in a list of skills (for group sub-text).
+function pluginCount(skills) {
+  const set = new Set();
+  for (const s of skills) if (s.plugin) set.add(s.plugin);
+  return set.size;
+}
+
+function buildWeeklyMarkdown(weekly) {
+  const today = new Date().toISOString().slice(0, 10);
+  const lines = [];
+  lines.push('# Claude Skills Panel — Weekly Report');
+  lines.push(`_Generated ${today}_`);
+  lines.push('');
+  lines.push('## Summary');
+  lines.push(`- **This week**: ${weekly.weekTotal}×`);
+  lines.push(`- **Streak**: ${weekly.streakDays} days`);
+  lines.push(`- **All-time total**: ${weekly.totalCopies}×`);
+  lines.push('');
+  lines.push('## Last 7 days');
+  lines.push('| Date | Count |');
+  lines.push('|---|---|');
+  for (let i = 0; i < weekly.days.length; i++) {
+    lines.push(`| ${weekly.days[i]} | ${weekly.counts[i]} |`);
+  }
+  lines.push('');
+  if (weekly.topSkills && weekly.topSkills.length) {
+    lines.push("## Top 5 this week");
+    weekly.topSkills.forEach((top, i) => {
+      lines.push(`${i + 1}. **${top.label}** — ${top.count}×`);
+    });
+  } else {
+    lines.push('_No activity this week yet._');
+  }
+  lines.push('');
+  return lines.join('\n');
+}
 
 const escapeHtml = (s) =>
   String(s || '')
@@ -232,6 +340,8 @@ function renderHtml(webview, skills) {
   const meta = userConfig.getMeta();
   const locale = i18n.resolveLocale((cfg.meta && cfg.meta.locale) || null, vscode.env.language);
   const t = i18n.tFor(locale);
+  const theme = userConfig.getTheme();
+  const customGroups = userConfig.getGroups();
   const enriched = skills.map((s) => userConfig.applyOverrides(s, cfg));
 
   const grouped = {};
@@ -239,7 +349,10 @@ function renderHtml(webview, skills) {
     if (!grouped[s.group]) grouped[s.group] = [];
     grouped[s.group].push(s);
   }
-  const order = ['user', 'project', 'plugin'];
+  // Custom groups render first (in user-defined order), then auto groups.
+  const customGroupIds = customGroups.map((g) => g.id);
+  const order = [...customGroupIds, 'user', 'project', 'plugin'];
+  const customGroupById = Object.fromEntries(customGroups.map((g) => [g.id, g]));
 
   // Recently used: top 6 by lastUsed (excludes hidden)
   const recents = enriched
@@ -316,7 +429,10 @@ function renderHtml(webview, skills) {
   const sections = order
     .filter((g) => grouped[g] && grouped[g].length)
     .map((g) => {
-      const meta = GROUP_LABELS[g];
+      const isCustom = !!customGroupById[g];
+      const meta = isCustom
+        ? { labelKey: null, sub: null, emoji: customGroupById[g].emoji || '📁', custom: true, name: customGroupById[g].name, id: g }
+        : GROUP_LABELS[g];
       const visible = grouped[g].filter((s) => !s.hidden);
       if (!visible.length) return '';
       const cards = visible
@@ -333,6 +449,9 @@ function renderHtml(webview, skills) {
           const kindBadge = s.kind === 'command' ? '<span class="kind-badge cmd">cmd</span>' : '';
           const starsHtml = s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>';
           const lvBadge = s.level > 0 ? `<span class="lv-badge lv${s.level}">LV.${s.level}</span>` : '';
+          const sourceLine = s.plugin
+            ? `<div class="hover-source">🧩 ${escapeHtml(s.plugin)}${s.marketplace ? ` <span class="hover-marketplace">@${escapeHtml(s.marketplace)}</span>` : ''}</div>`
+            : '';
           return `
             <button class="skill"
               data-name="${original}"
@@ -344,7 +463,10 @@ function renderHtml(webview, skills) {
               data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
               data-count="${s.usage.count}"
               data-last="${s.usage.lastUsed || ''}"
-              data-level="${s.level}">
+              data-level="${s.level}"
+              data-plugin="${escapeHtml(s.plugin || '')}"
+              data-marketplace="${escapeHtml(s.marketplace || '')}"
+              data-group="${escapeHtml(s.customGroup || '')}">
               ${kindBadge}
               ${lvBadge}
               <span class="edit-btn" title="${t('card.edit')}">✎</span>
@@ -355,6 +477,7 @@ function renderHtml(webview, skills) {
               <div class="hover-card">
                 <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
                 <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
+                ${sourceLine}
                 <div class="hover-meta">
                   ${s.usage.count ? t('card.usage', { count: s.usage.count, level: s.level }) : `<i>${t('card.notUsed')}</i>`}
                 </div>
@@ -363,12 +486,24 @@ function renderHtml(webview, skills) {
             </button>`;
         })
         .join('');
+      const heading = isCustom
+        ? escapeHtml(meta.name)
+        : t(meta.labelKey);
+      const subText = isCustom
+        ? t('group.custom.sub')
+        : (g === 'plugin' && pluginCount(grouped[g])
+            ? t('group.plugin.sub', { plugins: pluginCount(grouped[g]) })
+            : meta.sub);
+      const editBtn = isCustom
+        ? `<button class="group-edit-btn" data-group-id="${escapeHtml(g)}" title="${t('group.edit')}">✎</button>`
+        : '';
       return `
-        <section class="group">
+        <section class="group${isCustom ? ' custom-group' : ''}" data-group-id="${escapeHtml(g)}">
           <header>
             <span class="group-icon">${meta.emoji}</span>
-            <h3>${t(meta.labelKey)}</h3>
-            <span class="sub">(${meta.sub} · ${visible.length}${visible.length !== grouped[g].length ? `/${grouped[g].length}` : ''})</span>
+            <h3>${heading}</h3>
+            <span class="sub">(${subText} · ${visible.length}${visible.length !== grouped[g].length ? `/${grouped[g].length}` : ''})</span>
+            ${editBtn}
             <span class="group-line"></span>
           </header>
           <div class="grid">${cards}</div>
@@ -447,6 +582,7 @@ function renderHtml(webview, skills) {
             ? `<img class="skill-icon-img${userUri ? ' user-icon' : ''}" src="${pngUri}" alt="${escapeHtml(s.aliasOriginal)}" />`
             : `<div class="skill-icon">${pickIcon(s)}</div>`;
           return `<button class="qslot filled"
+              draggable="true"
               data-slot="${i}"
               data-key="${key}"
               data-name="${escapeHtml(s.aliasOriginal)}"
@@ -513,7 +649,7 @@ function renderHtml(webview, skills) {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp} https: data:; style-src ${csp} 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'unsafe-inline'; connect-src 'none';" />
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DotGothic16&display=swap" rel="stylesheet" />
 <style>
-  :root {
+  :root, body[data-theme="dark"] {
     --bg: #0e1018;
     --bg-2: #161a26;
     --fg: #e4e7ed;
@@ -528,6 +664,44 @@ function renderHtml(webview, skills) {
     --good: #22c55e;
     --bad: #ef4444;
     --magenta: #c084fc;
+    --dot-grid: rgba(125, 211, 252, 0.06);
+    --vignette: rgba(0, 0, 0, 0.5);
+  }
+  body[data-theme="retro"] {
+    --bg: #1a0f08;
+    --bg-2: #2a1810;
+    --fg: #ffb454;
+    --muted: #8a6939;
+    --frame: #8b5a2b;
+    --frame-strong: #4a2c14;
+    --tile-bg: #2e1b0f;
+    --tile-bg-2: #1f1308;
+    --hover: rgba(255, 180, 84, 0.10);
+    --accent: #ffb454;
+    --accent-2: #ffe066;
+    --good: #d4a017;
+    --bad: #d4421c;
+    --magenta: #d68c4f;
+    --dot-grid: rgba(255, 180, 84, 0.07);
+    --vignette: rgba(0, 0, 0, 0.65);
+  }
+  body[data-theme="lcd"] {
+    --bg: #0f380f;
+    --bg-2: #306230;
+    --fg: #9bbc0f;
+    --muted: #467246;
+    --frame: #467246;
+    --frame-strong: #1a3a1a;
+    --tile-bg: #1c4a1c;
+    --tile-bg-2: #133513;
+    --hover: rgba(155, 188, 15, 0.10);
+    --accent: #9bbc0f;
+    --accent-2: #c8d83c;
+    --good: #9bbc0f;
+    --bad: #b04018;
+    --magenta: #6f9420;
+    --dot-grid: rgba(155, 188, 15, 0.08);
+    --vignette: rgba(0, 0, 0, 0.45);
   }
   * { box-sizing: border-box; }
   body {
@@ -537,9 +711,9 @@ function renderHtml(webview, skills) {
     color: var(--fg);
     background:
       /* vignette */
-      radial-gradient(ellipse at center, transparent 0%, transparent 60%, rgba(0,0,0,0.5) 100%),
+      radial-gradient(ellipse at center, transparent 0%, transparent 60%, var(--vignette) 100%),
       /* dot grid */
-      radial-gradient(circle, rgba(125, 211, 252, 0.06) 1px, transparent 1px) 0 0/16px 16px,
+      radial-gradient(circle, var(--dot-grid) 1px, transparent 1px) 0 0/16px 16px,
       var(--bg);
     background-attachment: fixed;
     font-size: 12px;
@@ -952,6 +1126,9 @@ function renderHtml(webview, skills) {
   .skill[draggable="true"] { cursor: grab; }
   .skill[draggable="true"]:active { cursor: grabbing; }
   .skill.dragging { opacity: 0.4; }
+  .qslot.filled[draggable="true"] { cursor: grab; }
+  .qslot.filled[draggable="true"]:active { cursor: grabbing; }
+  .qslot.dragging { opacity: 0.4; }
 
   /* Free-roaming buddy pet */
   .buddy-pet {
@@ -1346,7 +1523,98 @@ function renderHtml(webview, skills) {
   .hover-name { font-weight: 700; color: var(--accent); margin-bottom: 4px; }
   .hover-alias { color: var(--muted); font-weight: 400; font-size: 10px; }
   .hover-desc { color: #cbd5e1; margin-bottom: 6px; }
+  .hover-source { color: #94a3b8; font-size: 10px; margin-bottom: 4px; }
+  .hover-marketplace { color: var(--muted); }
   .hover-hint { color: var(--muted); font-size: 10px; border-top: 1px dashed #374151; padding-top: 4px; }
+
+  /* Custom group sections + management */
+  .group .group-edit-btn {
+    margin-left: 6px;
+    background: transparent;
+    border: 1px solid var(--frame-strong);
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 10px;
+    border-radius: 2px;
+  }
+  .group .group-edit-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .custom-group h3 { color: var(--accent-2); }
+
+  /* Edit modal — group select */
+  .m-select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--tile-bg);
+    color: var(--fg);
+    border: 2px solid var(--frame);
+    font-family: inherit;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .m-select:focus { outline: none; border-color: var(--accent); }
+
+  /* Groups modal */
+  .groups-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .group-row {
+    display: flex; gap: 6px; align-items: center;
+    padding: 4px;
+    background: var(--tile-bg-2);
+    border: 1px solid var(--frame-strong);
+  }
+  .group-row .group-emoji {
+    width: 36px; text-align: center;
+    background: var(--bg);
+    border: 1px solid var(--frame-strong);
+    color: var(--fg);
+    padding: 4px;
+  }
+  .group-row .group-name {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--frame-strong);
+    color: var(--fg);
+    padding: 4px 6px;
+  }
+  .group-row .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--frame-strong);
+    color: var(--muted);
+    padding: 2px 6px;
+    cursor: pointer;
+  }
+  .group-row .btn-ghost:hover:not([disabled]) { color: var(--accent); border-color: var(--accent); }
+  .group-row .btn-ghost[disabled] { opacity: 0.3; cursor: not-allowed; }
+  .group-add-row { display: flex; gap: 6px; align-items: center; }
+  .group-add-row #group-add-emoji {
+    width: 36px; text-align: center;
+    background: var(--bg);
+    border: 1px solid var(--frame-strong);
+    color: var(--fg);
+    padding: 4px;
+  }
+  .group-add-row #group-add-name {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--frame-strong);
+    color: var(--fg);
+    padding: 4px 6px;
+  }
+
+  /* Hidden markdown textarea (used as a transport for copy/save) */
+  .report-md-hidden { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    background: transparent;
+    border: 2px solid var(--frame);
+    color: var(--accent);
+    padding: 4px 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent-2); }
 
 
   /* Edit modal */
@@ -1552,7 +1820,7 @@ function renderHtml(webview, skills) {
   .empty { color: var(--muted); text-align: center; padding: 24px; }
 </style>
 </head>
-<body>
+<body data-theme="${theme}">
   <div class="toolbar">
     <div class="toolbar-search">
       <span class="bracket-l">[</span>
@@ -1567,9 +1835,11 @@ function renderHtml(webview, skills) {
       </div>
       <button class="meta-btn" id="achv-btn" title="${t('toolbar.achievements')}">🏆</button>
       <button class="meta-btn" id="report-btn" title="${t('toolbar.weeklyReport')}">📊</button>
+      <button class="meta-btn" id="groups-btn" title="${t('toolbar.groups')}">📁</button>
       <button class="exec-mode-btn" id="exec-mode-btn" title="${t('toolbar.execMode')}">▶ Off</button>
       <button class="sound-toggle" id="sound-toggle" title="${t('toolbar.sound')}">♪</button>
       <button class="scanlines-toggle" id="scanlines-toggle" title="${t('toolbar.scanlines')}">▦</button>
+      <button class="theme-toggle" id="theme-toggle" title="${t('toolbar.theme')}" data-theme="${theme}">🎨 ${userConfig.THEME_LABELS[theme] || theme}</button>
       <button class="locale-toggle" id="locale-toggle" title="${t('toolbar.locale')}">🌐 ${locale.toUpperCase()}</button>
     </div>
   </div>
@@ -1607,6 +1877,11 @@ function renderHtml(webview, skills) {
       <label style="margin-top:8px;">${t('modal.edit.spark')} <span class="hint">${t('modal.edit.sparkHint')}</span></label>
       <input type="text" id="m-spark-search" class="spark-search-input" placeholder="${t('modal.edit.sparkSearchPh')}" />
       <div class="spark-preset-grid" id="m-spark-grid" data-presets="${sparkPresetsJson}"></div>
+      <label style="margin-top:8px;">${t('modal.edit.group')}</label>
+      <select id="m-group" class="m-select">
+        <option value="">${t('modal.edit.groupAuto')}</option>
+        ${customGroups.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml((g.emoji || '') + ' ' + g.name)}</option>`).join('')}
+      </select>
       <div class="modal-row">
         <input type="checkbox" id="m-hidden" />
         <label for="m-hidden" style="margin: 0; font-size: 11px; color: var(--fg);">${t('modal.edit.hide')}</label>
@@ -1615,6 +1890,34 @@ function renderHtml(webview, skills) {
         <button class="btn btn-danger" id="m-reset">${t('modal.edit.reset')}</button>
         <button class="btn" id="m-cancel">${t('modal.edit.cancel')}</button>
         <button class="btn btn-primary" id="m-save">${t('modal.edit.save')}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="groups-bg">
+    <div class="modal">
+      <h4>${t('modal.groups.title')}</h4>
+      <div class="hint" style="margin-bottom: 8px;">${t('modal.groups.hint')}</div>
+      <div id="groups-list" class="groups-list">
+        ${customGroups.length
+          ? customGroups.map((g, i) => `
+            <div class="group-row" data-id="${escapeHtml(g.id)}">
+              <input type="text" class="group-emoji" maxlength="3" value="${escapeHtml(g.emoji || '📁')}" />
+              <input type="text" class="group-name" maxlength="40" value="${escapeHtml(g.name)}" />
+              <button class="btn btn-ghost group-up" type="button" ${i === 0 ? 'disabled' : ''} title="${t('modal.groups.up')}">↑</button>
+              <button class="btn btn-ghost group-down" type="button" ${i === customGroups.length - 1 ? 'disabled' : ''} title="${t('modal.groups.down')}">↓</button>
+              <button class="btn btn-danger group-del" type="button" title="${t('modal.groups.delete')}">✕</button>
+            </div>`).join('')
+          : `<div class="empty" style="padding:12px;">${t('modal.groups.empty')}</div>`
+        }
+      </div>
+      <div class="group-add-row" style="margin-top: 10px;">
+        <input type="text" id="group-add-emoji" maxlength="3" value="📁" />
+        <input type="text" id="group-add-name" maxlength="40" placeholder="${t('modal.groups.addPh')}" />
+        <button class="btn btn-primary" id="group-add-btn" type="button">${t('modal.groups.add')}</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="groups-close">${t('modal.groups.close')}</button>
       </div>
     </div>
   </div>
@@ -1729,7 +2032,10 @@ function renderHtml(webview, skills) {
           `).join('')}
         </ol>
       </div>` : `<div class="report-empty">${t('modal.report.empty')}</div>`}
+      <textarea id="report-md" class="report-md-hidden" readonly>${escapeHtml(buildWeeklyMarkdown(weekly))}</textarea>
       <div class="modal-actions">
+        <button class="btn" id="report-copy-md">${t('modal.report.copyMd')}</button>
+        <button class="btn" id="report-save-md">${t('modal.report.saveMd')}</button>
         <button class="btn" id="report-close">${t('modal.report.close')}</button>
       </div>
     </div>
@@ -1754,6 +2060,15 @@ if (localeBtn) {
   localeBtn.addEventListener('click', () => {
     const next = LOCALE === 'ko' ? 'en' : 'ko';
     vscode.postMessage({ type: 'setLocale', locale: next });
+  });
+}
+const themeBtn = document.getElementById('theme-toggle');
+if (themeBtn) {
+  themeBtn.addEventListener('click', () => {
+    const themes = ['dark', 'retro', 'lcd'];
+    const cur = themeBtn.dataset.theme || 'dark';
+    const next = themes[(themes.indexOf(cur) + 1) % themes.length];
+    vscode.postMessage({ type: 'setTheme', theme: next });
   });
 }
 
@@ -1847,16 +2162,97 @@ execBtn.addEventListener('click', () => {
 const achvBg = document.getElementById('achv-bg');
 const reportBg = document.getElementById('report-bg');
 const buddyBg = document.getElementById('buddy-bg');
+const groupsBg = document.getElementById('groups-bg');
 const buddyPet = document.getElementById('buddy-pet');
 document.getElementById('achv-btn').addEventListener('click', () => { achvBg.classList.add('show'); sfxOpen(); });
 document.getElementById('report-btn').addEventListener('click', () => { reportBg.classList.add('show'); sfxOpen(); });
+const groupsBtn = document.getElementById('groups-btn');
+if (groupsBtn) groupsBtn.addEventListener('click', () => { groupsBg.classList.add('show'); sfxOpen(); });
 if (buddyPet) buddyPet.addEventListener('click', () => { buddyBg.classList.add('show'); sfxOpen(); });
 document.getElementById('achv-close').addEventListener('click', () => achvBg.classList.remove('show'));
 document.getElementById('report-close').addEventListener('click', () => reportBg.classList.remove('show'));
+const reportCopyBtn = document.getElementById('report-copy-md');
+const reportSaveBtn = document.getElementById('report-save-md');
+const reportMdEl = document.getElementById('report-md');
+if (reportCopyBtn && reportMdEl) {
+  reportCopyBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'copyWeeklyMarkdown', markdown: reportMdEl.value });
+    sfxClick();
+  });
+}
+if (reportSaveBtn && reportMdEl) {
+  reportSaveBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'saveWeeklyMarkdown', markdown: reportMdEl.value });
+    sfxClick();
+  });
+}
 document.getElementById('buddy-close').addEventListener('click', () => buddyBg.classList.remove('show'));
+const groupsCloseBtn = document.getElementById('groups-close');
+if (groupsCloseBtn) groupsCloseBtn.addEventListener('click', () => groupsBg.classList.remove('show'));
 achvBg.addEventListener('click', (e) => { if (e.target === achvBg) achvBg.classList.remove('show'); });
 reportBg.addEventListener('click', (e) => { if (e.target === reportBg) reportBg.classList.remove('show'); });
 buddyBg.addEventListener('click', (e) => { if (e.target === buddyBg) buddyBg.classList.remove('show'); });
+if (groupsBg) groupsBg.addEventListener('click', (e) => { if (e.target === groupsBg) groupsBg.classList.remove('show'); });
+
+// Group management interactions
+(function wireGroups() {
+  const list = document.getElementById('groups-list');
+  if (!list) return;
+  // Edit button on group section header opens the modal
+  document.querySelectorAll('.group-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      groupsBg.classList.add('show');
+      sfxOpen();
+    });
+  });
+  // Add new group
+  const addBtn = document.getElementById('group-add-btn');
+  const addName = document.getElementById('group-add-name');
+  const addEmoji = document.getElementById('group-add-emoji');
+  function doAdd() {
+    const name = (addName.value || '').trim();
+    if (!name) return;
+    vscode.postMessage({ type: 'addGroup', name, emoji: (addEmoji.value || '📁').trim() });
+  }
+  if (addBtn) addBtn.addEventListener('click', doAdd);
+  if (addName) addName.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
+  // Per-row interactions (rename on blur, delete, reorder)
+  list.querySelectorAll('.group-row').forEach((row) => {
+    const id = row.dataset.id;
+    const nameInput = row.querySelector('.group-name');
+    const emojiInput = row.querySelector('.group-emoji');
+    function persistRename() {
+      vscode.postMessage({
+        type: 'renameGroup',
+        id,
+        name: nameInput.value.trim(),
+        emoji: (emojiInput.value || '📁').trim(),
+      });
+    }
+    nameInput.addEventListener('blur', persistRename);
+    emojiInput.addEventListener('blur', persistRename);
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') persistRename(); });
+    row.querySelector('.group-del').addEventListener('click', () => {
+      if (confirm(nameInput.value + ' — ' + STR['modal.groups.confirmDel'])) {
+        vscode.postMessage({ type: 'removeGroup', id });
+      }
+    });
+    const upBtn = row.querySelector('.group-up');
+    const downBtn = row.querySelector('.group-down');
+    function reorder(delta) {
+      const ids = [...list.querySelectorAll('.group-row')].map((r) => r.dataset.id);
+      const idx = ids.indexOf(id);
+      if (idx < 0) return;
+      const target = idx + delta;
+      if (target < 0 || target >= ids.length) return;
+      [ids[idx], ids[target]] = [ids[target], ids[idx]];
+      vscode.postMessage({ type: 'reorderGroups', ids });
+    }
+    if (upBtn) upBtn.addEventListener('click', () => reorder(-1));
+    if (downBtn) downBtn.addEventListener('click', () => reorder(1));
+  });
+})();
 
 // ---- Free-roaming pet wander ----
 const PET_W = 56;
@@ -1915,6 +2311,7 @@ const mAlias = document.getElementById('m-alias');
 const mNote = document.getElementById('m-note');
 const mHidden = document.getElementById('m-hidden');
 const mTitle = document.getElementById('modal-title');
+const mGroup = document.getElementById('m-group');
 let toastTimer;
 let editingSkill = null;
 
@@ -1982,6 +2379,7 @@ function openEditModal(el) {
   mAlias.value = el.dataset.alias && el.dataset.alias !== editingSkill ? el.dataset.alias : '';
   mNote.value = el.dataset.note || '';
   mHidden.checked = el.dataset.hidden === '1';
+  if (mGroup) mGroup.value = el.dataset.group || '';
   pendingIconClear = false;
   pendingSparkIcon = null;
   setIconPreview(el.dataset.iconUri || '');
@@ -2008,6 +2406,7 @@ document.getElementById('m-save').addEventListener('click', () => {
     hidden: mHidden.checked,
     clearIcon: pendingIconClear,
     sparkIcon: pendingSparkIcon,
+    group: mGroup ? (mGroup.value || null) : undefined,
   });
   closeModal();
 });
@@ -2033,6 +2432,7 @@ window.addEventListener('message', (e) => {
   }
   if (m && m.type === 'showAchievements') achvBg.classList.add('show');
   if (m && m.type === 'showWeeklyReport') reportBg.classList.add('show');
+  if (m && m.type === 'toast' && m.key) showToast(t(m.key, m.vars));
   if (m && m.type === 'usageRecorded') {
     // Update card data attrs + stars, no full refresh
     document.querySelectorAll('.skill[data-name="' + m.name.replace(/"/g, '\\\\"') + '"]').forEach((el) => {
@@ -2160,6 +2560,11 @@ function triggerSkill(name, file, opts) {
     petToCard(opts.element);
   }
 }
+// Track in-flight slot drag (DataTransfer.types is only readable in dragenter/over,
+// so we mirror it here for click-to-clear UX).
+let draggingSlotIdx = null;
+const QUICK_MIME = 'application/x-quickbar-slot';
+
 document.querySelectorAll('.qslot').forEach((slot) => {
   const isLocked = () => slot.classList.contains('locked');
   slot.addEventListener('mouseenter', () => { if (!isLocked()) sfxHover(); });
@@ -2183,20 +2588,59 @@ document.querySelectorAll('.qslot').forEach((slot) => {
       showToast(t('toast.slotEmpty', { key: slot.dataset.key }));
     }
   });
+
+  // Filled slots are draggable: enables swap with another slot,
+  // and drag-out-of-panel to clear.
+  if (slot.classList.contains('filled')) {
+    slot.addEventListener('dragstart', (e) => {
+      const fromIdx = parseInt(slot.dataset.slot, 10);
+      draggingSlotIdx = fromIdx;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData(QUICK_MIME, String(fromIdx));
+      e.dataTransfer.setData('text/plain', slot.dataset.name);
+      slot.classList.add('dragging');
+    });
+    slot.addEventListener('dragend', (e) => {
+      slot.classList.remove('dragging');
+      const idx = draggingSlotIdx;
+      draggingSlotIdx = null;
+      // dropEffect === 'none' means the drag was released over no valid drop
+      // target (anywhere outside the Quick Bar). Treat that as "clear slot".
+      if (e.dataTransfer.dropEffect === 'none' && idx !== null) {
+        vscode.postMessage({ type: 'setQuickbar', slot: idx, name: null });
+        sfxClick();
+        showToast(t('toast.slotEmpty', { key: slot.dataset.key }));
+      }
+    });
+  }
+
   slot.addEventListener('dragover', (e) => {
     if (isLocked()) return;
+    const isSlotDrag = e.dataTransfer.types.includes(QUICK_MIME);
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    slot.classList.add('dragover');
+    e.dataTransfer.dropEffect = isSlotDrag ? 'move' : 'copy';
+    // Don't highlight when hovering source slot during slot-to-slot drag
+    if (!(isSlotDrag && draggingSlotIdx === parseInt(slot.dataset.slot, 10))) {
+      slot.classList.add('dragover');
+    }
   });
   slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
   slot.addEventListener('drop', (e) => {
     if (isLocked()) return;
     e.preventDefault();
     slot.classList.remove('dragover');
+    const fromSlotRaw = e.dataTransfer.getData(QUICK_MIME);
+    const toIdx = parseInt(slot.dataset.slot, 10);
+    if (fromSlotRaw !== '') {
+      const fromIdx = parseInt(fromSlotRaw, 10);
+      if (fromIdx === toIdx) return;
+      vscode.postMessage({ type: 'swapQuickbar', from: fromIdx, to: toIdx });
+      sfxOpen();
+      return;
+    }
     const name = e.dataTransfer.getData('text/plain');
     if (!name) return;
-    vscode.postMessage({ type: 'setQuickbar', slot: parseInt(slot.dataset.slot, 10), name });
+    vscode.postMessage({ type: 'setQuickbar', slot: toIdx, name });
     sfxOpen();
     showToast(t('toast.slotRegistered', { key: slot.dataset.key, name }));
   });
@@ -2312,6 +2756,31 @@ class SkillsViewProvider {
         userConfig.setQuickbar(msg.slot, msg.name || null);
         clearTimeout(this._quickRefreshTimer);
         this._quickRefreshTimer = setTimeout(() => this.refresh(), 150);
+      } else if (msg.type === 'swapQuickbar' && typeof msg.from === 'number' && typeof msg.to === 'number') {
+        userConfig.swapQuickbar(msg.from, msg.to);
+        clearTimeout(this._quickRefreshTimer);
+        this._quickRefreshTimer = setTimeout(() => this.refresh(), 150);
+      } else if (msg.type === 'copyWeeklyMarkdown' && typeof msg.markdown === 'string') {
+        await vscode.env.clipboard.writeText(msg.markdown);
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'toast', key: 'toast.weeklyCopied' });
+        }
+      } else if (msg.type === 'saveWeeklyMarkdown' && typeof msg.markdown === 'string') {
+        const today = new Date().toISOString().slice(0, 10);
+        const ws = vscode.workspace.workspaceFolders;
+        const defaultUri = vscode.Uri.file(
+          path.join(ws && ws[0] ? ws[0].uri.fsPath : os.homedir(), `claude-skills-weekly-${today}.md`)
+        );
+        const target = await vscode.window.showSaveDialog({
+          defaultUri,
+          filters: { Markdown: ['md'] },
+        });
+        if (target) {
+          fs.writeFileSync(target.fsPath, msg.markdown);
+          for (const v of this.views) {
+            v.webview.postMessage({ type: 'toast', key: 'toast.weeklySaved' });
+          }
+        }
       } else if (msg.type === 'setBuddyName') {
         userConfig.setCharacterName(msg.name || '');
         clearTimeout(this._buddyRefreshTimer);
@@ -2322,6 +2791,10 @@ class SkillsViewProvider {
         if (msg.alias) cfg.skills[msg.name].alias = msg.alias; else delete cfg.skills[msg.name].alias;
         if (msg.note) cfg.skills[msg.name].note = msg.note; else delete cfg.skills[msg.name].note;
         if (msg.hidden) cfg.skills[msg.name].hidden = true; else delete cfg.skills[msg.name].hidden;
+        if (msg.group !== undefined) {
+          if (msg.group) cfg.skills[msg.name].group = msg.group;
+          else delete cfg.skills[msg.name].group;
+        }
         if (msg.clearIcon) {
           const oldIcon = cfg.skills[msg.name].iconPath;
           if (oldIcon) {
@@ -2344,6 +2817,29 @@ class SkillsViewProvider {
         this.refresh();
       } else if (msg.type === 'setLocale' && msg.locale) {
         userConfig.setLocale(msg.locale);
+        this.refresh();
+      } else if (msg.type === 'setTheme' && msg.theme) {
+        userConfig.setTheme(msg.theme);
+        this.refresh();
+      } else if (msg.type === 'addGroup' && msg.name) {
+        userConfig.addGroup({ name: msg.name, emoji: msg.emoji });
+        this.refresh();
+      } else if (msg.type === 'renameGroup' && msg.id) {
+        userConfig.renameGroup(msg.id, msg.name, msg.emoji);
+        this.refresh();
+      } else if (msg.type === 'removeGroup' && msg.id) {
+        userConfig.removeGroup(msg.id);
+        this.refresh();
+      } else if (msg.type === 'reorderGroups' && Array.isArray(msg.ids)) {
+        userConfig.reorderGroups(msg.ids);
+        this.refresh();
+      } else if (msg.type === 'setSkillGroup' && msg.name) {
+        const cfg2 = userConfig.read();
+        if (!cfg2.skills[msg.name]) cfg2.skills[msg.name] = {};
+        if (msg.group) cfg2.skills[msg.name].group = msg.group;
+        else delete cfg2.skills[msg.name].group;
+        if (Object.keys(cfg2.skills[msg.name]).length === 0) delete cfg2.skills[msg.name];
+        userConfig.write(cfg2);
         this.refresh();
       } else if (msg.type === 'pickIcon' && msg.name) {
         const picked = await vscode.window.showOpenDialog({

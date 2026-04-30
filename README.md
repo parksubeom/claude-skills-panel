@@ -1,12 +1,13 @@
 # Claude Code Skills Panel
 
-[![Version](https://img.shields.io/badge/version-0.20.1-f59e0b?style=flat-square)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
-[![OpenVSX](https://img.shields.io/badge/OpenVSX-Install-7dd3fc?style=flat-square&logo=vscodium)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
+[![OpenVSX Version](https://img.shields.io/open-vsx/v/parksubeom/claude-skills-panel?style=flat-square&label=OpenVSX&color=7dd3fc&logo=vscodium)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/parksubeom.claude-skills-panel?style=flat-square&label=VS%20Marketplace&color=2563eb&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel)
+[![OpenVSX Downloads](https://img.shields.io/open-vsx/dt/parksubeom/claude-skills-panel?style=flat-square&label=Downloads&color=22c55e)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
 > Built because memorizing slash commands is annoying. Turned into a tiny game along the way.
 
-A pixel-art panel for **Claude Code** that lets you browse, search, and instantly trigger all your skills and commands — with character growth, achievements, and a free-roaming buddy included.
+A pixel-art panel for **Claude Code** that auto-discovers every slash command on your machine — your custom skills, project-level commands, and **all installed Claude Code plugins** (`/plugin install …`) — and lets you trigger them with one click. Character growth, achievements, and a free-roaming buddy included.
 
 ---
 
@@ -22,21 +23,26 @@ A pixel-art panel for **Claude Code** that lets you browse, search, and instantl
 
 ## Install
 
-**Cursor / VSCode**
+**Cursor / Windsurf / VS Codium** — install from [OpenVSX](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
+**VS Code** — install from [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel)
 
-> Open the Extensions tab (`Cmd+Shift+X`), search for `Claude Code Skills Panel`, and click **Install**.
-
-Or install directly from [OpenVSX Marketplace](https://open-vsx.org/extension/parksubeom/claude-skills-panel).
+> Or open the Extensions tab (`Cmd+Shift+X`), search `Claude Code Skills Panel`, and click **Install**.
 
 ---
 
 ## Features
 
 ### 🔍 Auto-discovery
-Scans all skill sources automatically:
-- `~/.claude/skills/` — user-defined skills
-- `<project>/.claude/skills/` — project-level skills
-- `~/.claude/plugins/cache/**` — all installed plugins (superpowers, etc.) including both `SKILL.md` and `commands/*.md`
+Scans every slash command source on your machine, no setup required:
+
+| Source | What it finds |
+|---|---|
+| `~/.claude/skills/` | Your user-level skills |
+| `~/.claude/commands/` | Your custom slash commands |
+| `<project>/.claude/skills/` and `commands/` | Project-level overrides |
+| `~/.claude/plugins/cache/**` | Every plugin installed via `/plugin install …` (superpowers, code-review, skill-creator, …) — hover a card to see which **plugin@marketplace** it came from |
+
+New plugin? Just install with `/plugin install <name>@<marketplace>` and it shows up on the next refresh.
 
 ### 🎮 Interactions
 
@@ -141,10 +147,24 @@ npm run build:spark    # 30 spark-style skill icons
 npm run build:buddy    # 6-stage buddy character
 npm run package        # build all + package .vsix
 
-# Publish
-npx ovsx publish -p <token>   # OpenVSX (Cursor)
-npx vsce publish              # VS Code Marketplace
+# Manual publish (CI handles this on tagged releases)
+npx ovsx publish -p $OVSX_PAT       # OpenVSX (Cursor / Windsurf / VS Codium)
+npx vsce publish -p $VSCE_PAT       # VS Code Marketplace
 ```
+
+### Releasing
+
+Push a `vX.Y.Z` tag — GitHub Actions builds, packages, and publishes to **both marketplaces** in parallel.
+See [.github/workflows/publish.yml](.github/workflows/publish.yml) for the full pipeline.
+
+---
+
+## Links
+
+- **Issues / feature requests** — [GitHub Issues](https://github.com/parksubeom/claude-skills-panel/issues)
+- **Changelog** — [CHANGELOG.md](CHANGELOG.md)
+- **OpenVSX listing** — https://open-vsx.org/extension/parksubeom/claude-skills-panel
+- **VS Marketplace listing** — https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel
 
 ---
 

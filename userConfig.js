@@ -48,6 +48,11 @@ function setSkillField(name, field, value) {
 function applyOverrides(skill, cfg) {
   const entry = getSkillEntry(cfg, skill.name);
   const usage = entry.usage || { count: 0, lastUsed: null, firstUsed: null };
+  // Resolve effective group: custom assignment overrides auto-detected.
+  const customGroups = (cfg.meta && Array.isArray(cfg.meta.groups)) ? cfg.meta.groups : [];
+  const customGroupId = entry.group && customGroups.some((g) => g.id === entry.group)
+    ? entry.group
+    : null;
   return {
     ...skill,
     label: entry.alias || skill.name,
@@ -58,6 +63,9 @@ function applyOverrides(skill, cfg) {
     aliasOriginal: skill.name,
     usage,
     level: levelFor(usage.count),
+    autoGroup: skill.group,
+    customGroup: customGroupId,
+    group: customGroupId || skill.group,
   };
 }
 
@@ -297,6 +305,100 @@ function setLocale(locale) {
   return cfg;
 }
 
+const THEMES = ['dark', 'retro', 'lcd'];
+const THEME_LABELS = { dark: 'Dark', retro: 'Retro', lcd: 'LCD' };
+const DEFAULT_THEME = 'dark';
+
+function getTheme() {
+  const cfg = read();
+  const t = cfg.meta && cfg.meta.theme;
+  return THEMES.includes(t) ? t : DEFAULT_THEME;
+}
+
+function setTheme(theme) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  if (THEMES.includes(theme)) cfg.meta.theme = theme;
+  else delete cfg.meta.theme;
+  write(cfg);
+  return cfg;
+}
+
+// User-defined groups: ordered list of { id, name, emoji? }.
+// Skills can be assigned to a custom group via skills[name].group = id,
+// which overrides the auto-detected user/project/plugin grouping.
+function getGroups() {
+  const cfg = read();
+  const groups = (cfg.meta && Array.isArray(cfg.meta.groups)) ? cfg.meta.groups : [];
+  return groups.filter((g) => g && g.id && g.name);
+}
+
+function setGroups(groups) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  cfg.meta.groups = (Array.isArray(groups) ? groups : []).filter(
+    (g) => g && typeof g.id === 'string' && typeof g.name === 'string'
+  );
+  write(cfg);
+  return cfg;
+}
+
+function addGroup({ name, emoji }) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  if (!Array.isArray(cfg.meta.groups)) cfg.meta.groups = [];
+  const id = 'g_' + Math.random().toString(36).slice(2, 9);
+  cfg.meta.groups.push({ id, name: String(name || 'Untitled').slice(0, 40), emoji: emoji || '📁' });
+  write(cfg);
+  return id;
+}
+
+function renameGroup(id, name, emoji) {
+  const cfg = read();
+  if (!cfg.meta || !Array.isArray(cfg.meta.groups)) return cfg;
+  const g = cfg.meta.groups.find((x) => x && x.id === id);
+  if (g) {
+    if (typeof name === 'string') g.name = name.slice(0, 40);
+    if (typeof emoji === 'string') g.emoji = emoji;
+  }
+  write(cfg);
+  return cfg;
+}
+
+function removeGroup(id) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  if (Array.isArray(cfg.meta.groups)) {
+    cfg.meta.groups = cfg.meta.groups.filter((g) => g && g.id !== id);
+  }
+  // Detach any skill assigned to this group
+  for (const name of Object.keys(cfg.skills || {})) {
+    if (cfg.skills[name] && cfg.skills[name].group === id) {
+      delete cfg.skills[name].group;
+    }
+  }
+  write(cfg);
+  return cfg;
+}
+
+function reorderGroups(orderedIds) {
+  const cfg = read();
+  if (!cfg.meta || !Array.isArray(cfg.meta.groups)) return cfg;
+  const byId = new Map(cfg.meta.groups.map((g) => [g.id, g]));
+  const next = [];
+  for (const id of orderedIds) {
+    if (byId.has(id)) {
+      next.push(byId.get(id));
+      byId.delete(id);
+    }
+  }
+  // Append any leftovers to preserve data
+  for (const g of byId.values()) next.push(g);
+  cfg.meta.groups = next;
+  write(cfg);
+  return cfg;
+}
+
 function setQuickbar(slot, name) {
   const cfg = read();
   if (!cfg.meta) cfg.meta = {};
@@ -308,6 +410,23 @@ function setQuickbar(slot, name) {
     cfg.meta.quickbar = cfg.meta.quickbar.map((n) => (n === name ? null : n));
   }
   cfg.meta.quickbar[slot] = name || null;
+  write(cfg);
+  return cfg;
+}
+
+// Swap (or move-into-empty) two Quick Bar slots in a single write.
+function swapQuickbar(from, to) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  if (!Array.isArray(cfg.meta.quickbar)) cfg.meta.quickbar = [null, null, null, null, null, null];
+  while (cfg.meta.quickbar.length < 6) cfg.meta.quickbar.push(null);
+  const fromI = Number(from);
+  const toI = Number(to);
+  if (!Number.isInteger(fromI) || !Number.isInteger(toI)) return cfg;
+  if (fromI === toI || fromI < 0 || fromI > 5 || toI < 0 || toI > 5) return cfg;
+  const tmp = cfg.meta.quickbar[fromI];
+  cfg.meta.quickbar[fromI] = cfg.meta.quickbar[toI];
+  cfg.meta.quickbar[toI] = tmp;
   write(cfg);
   return cfg;
 }
@@ -332,6 +451,7 @@ module.exports = {
   getMeta,
   getWeeklyStats,
   setQuickbar,
+  swapQuickbar,
   levelFor,
   LEVEL_THRESHOLDS,
   getCharacter,
@@ -343,4 +463,14 @@ module.exports = {
   BUDDY_NAMES,
   getLocale,
   setLocale,
+  getTheme,
+  setTheme,
+  THEMES,
+  THEME_LABELS,
+  getGroups,
+  setGroups,
+  addGroup,
+  renameGroup,
+  removeGroup,
+  reorderGroups,
 };

@@ -1,8 +1,8 @@
 {
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
-  "description": "Pixel-art skill panel for Claude Code — aliases, custom icons, Quick Bar, character growth, achievements. (i18n: English / 한국어)",
-  "version": "0.22.0",
+  "description": "Pixel-art panel for Claude Code — auto-discovers your skills, slash commands, and installed plugins. Aliases, Quick Bar, achievements, character growth. (English / 한국어)",
+  "version": "0.23.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",
@@ -25,15 +25,34 @@
   "keywords": [
     "claude",
     "claude-code",
+    "claude-code-plugin",
+    "claude-code-plugins",
     "skills",
     "ai",
     "anthropic",
     "slash-commands",
+    "slash-command",
+    "command-palette",
+    "superpowers",
+    "mcp",
     "pixel-art",
+    "8-bit",
+    "retro",
     "gamification",
     "cursor",
-    "productivity"
+    "productivity",
+    "dotfiles",
+    "developer-tools"
   ],
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
+  "qna": "https://github.com/parksubeom/claude-skills-panel/issues",
+  "pricing": "Free",
+  "sponsor": {
+    "url": "https://github.com/parksubeom"
+  },
   "main": "./extension.js",
   "activationEvents": [
     "onStartupFinished"
@@ -109,7 +128,8 @@
     "build:pixels": "node scripts/build-pixel-icons.js",
     "build:spark": "node scripts/build-spark-icons.js",
     "build:buddy": "node scripts/build-buddy-icons.js",
-    "package": "npm run build:pixels && npm run build:spark && npm run build:buddy && vsce package",
+    "verify": "node scripts/check-i18n.js && node -c extension.js && node -c userConfig.js && node -c achievements.js && node -c iconMap.js && node -c i18n/strings.js",
+    "package": "npm run verify && npm run build:pixels && npm run build:spark && npm run build:buddy && vsce package",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish",
     "publish:all": "npm run package && vsce publish && ovsx publish"
