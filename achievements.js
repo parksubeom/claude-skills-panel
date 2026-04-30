@@ -33,33 +33,34 @@ function computeStats(cfg) {
   };
 }
 
+// `name` / `desc` are i18n keys resolved via i18n/strings.js at display time.
 const ACHIEVEMENTS = [
   // Usage volume
-  { id: 'first_step',   name: '첫 발걸음',     desc: '처음으로 스킬 복사',          icon: '👣', check: (s) => s.totalCopies >= 1 },
-  { id: 'warmup',       name: '워밍업',        desc: '총 10회 복사',                icon: '🌱', check: (s) => s.totalCopies >= 10 },
-  { id: 'centurion',    name: '백 번의 기록',  desc: '총 100회 복사',               icon: '💯', check: (s) => s.totalCopies >= 100 },
-  { id: 'thousand',     name: '천부장',        desc: '총 1000회 복사',              icon: '🏆', check: (s) => s.totalCopies >= 1000 },
+  { id: 'first_step',   icon: '👣', check: (s) => s.totalCopies >= 1 },
+  { id: 'warmup',       icon: '🌱', check: (s) => s.totalCopies >= 10 },
+  { id: 'centurion',    icon: '💯', check: (s) => s.totalCopies >= 100 },
+  { id: 'thousand',     icon: '🏆', check: (s) => s.totalCopies >= 1000 },
 
   // Variety
-  { id: 'collector_5',  name: '컬렉터',        desc: '5종 이상 다른 스킬 사용',     icon: '🎒', check: (s) => s.distinct >= 5 },
-  { id: 'collector_15', name: '연구가',        desc: '15종 이상 다른 스킬 사용',    icon: '🔬', check: (s) => s.distinct >= 15 },
+  { id: 'collector_5',  icon: '🎒', check: (s) => s.distinct >= 5 },
+  { id: 'collector_15', icon: '🔬', check: (s) => s.distinct >= 15 },
 
   // Streak
-  { id: 'streak_3',     name: '꾸준한',        desc: '3일 연속 사용',               icon: '🔥', check: (s) => s.streakDays >= 3 },
-  { id: 'streak_7',     name: '개근',          desc: '7일 연속 사용',               icon: '🗓️', check: (s) => s.streakDays >= 7 },
-  { id: 'streak_30',    name: '한 달 개근',    desc: '30일 연속 사용',              icon: '👑', check: (s) => s.streakDays >= 30 },
+  { id: 'streak_3',     icon: '🔥', check: (s) => s.streakDays >= 3 },
+  { id: 'streak_7',     icon: '🗓️', check: (s) => s.streakDays >= 7 },
+  { id: 'streak_30',    icon: '👑', check: (s) => s.streakDays >= 30 },
 
   // Mastery
-  { id: 'mastery_3',    name: '숙련',          desc: '한 스킬 LV.3 달성',           icon: '⭐', check: (s) => s.maxLevel >= 3 },
-  { id: 'mastery_5',    name: '마스터',        desc: '한 스킬 LV.5 달성',           icon: '🌟', check: (s) => s.maxLevel >= 5 },
+  { id: 'mastery_3',    icon: '⭐', check: (s) => s.maxLevel >= 3 },
+  { id: 'mastery_5',    icon: '🌟', check: (s) => s.maxLevel >= 5 },
 
   // Customization
-  { id: 'quickbar_full',name: '장비왕',        desc: 'Quick Bar 6칸 모두 채움',     icon: '🎮', check: (s) => s.quickbarFilled >= 6 },
-  { id: 'alias_master', name: '별칭 마스터',   desc: '5개 스킬에 별칭 부여',        icon: '✏️', check: (s) => s.aliasCount >= 5 },
-  { id: 'declutter',    name: '정리정돈',      desc: '한 개 이상 스킬 숨김',        icon: '🧹', check: (s) => s.hiddenCount >= 1 },
-  { id: 'designer',     name: '디자이너',      desc: '한 개 이상 커스텀 아이콘',    icon: '🎨', check: (s) => s.customIconCount >= 1 },
-  { id: 'archivist',    name: '기록가',        desc: '5개 스킬에 메모 작성',        icon: '📝', check: (s) => s.noteCount >= 5 },
-];
+  { id: 'quickbar_full',icon: '🎮', check: (s) => s.quickbarFilled >= 6 },
+  { id: 'alias_master', icon: '✏️', check: (s) => s.aliasCount >= 5 },
+  { id: 'declutter',    icon: '🧹', check: (s) => s.hiddenCount >= 1 },
+  { id: 'designer',     icon: '🎨', check: (s) => s.customIconCount >= 1 },
+  { id: 'archivist',    icon: '📝', check: (s) => s.noteCount >= 5 },
+].map((a) => ({ ...a, nameKey: `achv.${a.id}.name`, descKey: `achv.${a.id}.desc` }));
 
 // Returns newly-earned achievement objects (full objects, not just ids).
 // Mutates cfg.meta.achievements (caller responsible for write).

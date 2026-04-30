@@ -283,6 +283,20 @@ function getWeeklyStats() {
   };
 }
 
+function getLocale() {
+  const cfg = read();
+  return (cfg.meta && cfg.meta.locale) || null;
+}
+
+function setLocale(locale) {
+  const cfg = read();
+  if (!cfg.meta) cfg.meta = {};
+  if (locale) cfg.meta.locale = locale;
+  else delete cfg.meta.locale;
+  write(cfg);
+  return cfg;
+}
+
 function setQuickbar(slot, name) {
   const cfg = read();
   if (!cfg.meta) cfg.meta = {};
@@ -327,4 +341,6 @@ module.exports = {
   buddyStageFor,
   BUDDY_THRESHOLDS,
   BUDDY_NAMES,
+  getLocale,
+  setLocale,
 };

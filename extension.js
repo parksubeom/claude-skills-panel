@@ -5,6 +5,7 @@ const os = require('os');
 const { pickIcon } = require('./iconMap');
 const userConfig = require('./userConfig');
 const achievements = require('./achievements');
+const i18n = require('./i18n/strings');
 
 // OS-level paste keystroke. Cmd+V (macOS) / Ctrl+V (Windows / Linux).
 // Optionally follows with Enter for fully autonomous send.
@@ -205,10 +206,11 @@ function loadAllSkills() {
   return all;
 }
 
+// `label` is an i18n key; sub-text is path-like and stays as-is across locales.
 const GROUP_LABELS = {
-  user: { label: '내 스킬', sub: '~/.claude/skills', emoji: '📁' },
-  project: { label: '프로젝트', sub: '.claude/skills', emoji: '📂' },
-  plugin: { label: '플러그인', sub: 'superpowers / etc.', emoji: '🧩' },
+  user: { labelKey: 'group.user.label', sub: '~/.claude/skills', emoji: '📁' },
+  project: { labelKey: 'group.project.label', sub: '.claude/skills', emoji: '📂' },
+  plugin: { labelKey: 'group.plugin.label', sub: 'superpowers / etc.', emoji: '🧩' },
 };
 
 const escapeHtml = (s) =>
@@ -228,6 +230,8 @@ function renderStars(level) {
 function renderHtml(webview, skills) {
   const cfg = userConfig.read();
   const meta = userConfig.getMeta();
+  const locale = i18n.resolveLocale((cfg.meta && cfg.meta.locale) || null, vscode.env.language);
+  const t = i18n.tFor(locale);
   const enriched = skills.map((s) => userConfig.applyOverrides(s, cfg));
 
   const grouped = {};
@@ -343,18 +347,18 @@ function renderHtml(webview, skills) {
               data-level="${s.level}">
               ${kindBadge}
               ${lvBadge}
-              <span class="edit-btn" title="편집">✎</span>
+              <span class="edit-btn" title="${t('card.edit')}">✎</span>
               ${iconHtml}
               <div class="skill-name">${label}</div>
               ${aliased ? `<div class="skill-original">/${original}</div>` : ''}
               ${starsHtml}
               <div class="hover-card">
                 <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
-                <div class="hover-desc">${desc || '<i>설명 없음</i>'}</div>
+                <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
                 <div class="hover-meta">
-                  ${s.usage.count ? `사용 ${s.usage.count}회 · LV.${s.level}` : '<i>아직 사용 안함</i>'}
+                  ${s.usage.count ? t('card.usage', { count: s.usage.count, level: s.level }) : `<i>${t('card.notUsed')}</i>`}
                 </div>
-                <div class="hover-hint">클릭 → /${original} 복사</div>
+                <div class="hover-hint">${t('card.copyHint', { name: original })}</div>
               </div>
             </button>`;
         })
@@ -363,7 +367,7 @@ function renderHtml(webview, skills) {
         <section class="group">
           <header>
             <span class="group-icon">${meta.emoji}</span>
-            <h3>${meta.label}</h3>
+            <h3>${t(meta.labelKey)}</h3>
             <span class="sub">(${meta.sub} · ${visible.length}${visible.length !== grouped[g].length ? `/${grouped[g].length}` : ''})</span>
             <span class="group-line"></span>
           </header>
@@ -399,15 +403,15 @@ function renderHtml(webview, skills) {
         data-level="${s.level}">
         ${kindBadge}
         ${lvBadge}
-        <span class="edit-btn" title="편집">✎</span>
+        <span class="edit-btn" title="${t('card.edit')}">✎</span>
         ${iconHtml}
         <div class="skill-name">${label}</div>
         ${s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>'}
         <div class="hover-card">
           <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
-          <div class="hover-desc">${desc || '<i>설명 없음</i>'}</div>
-          <div class="hover-meta">사용 ${s.usage.count}회 · LV.${s.level}</div>
-          <div class="hover-hint">클릭 → /${original} 복사</div>
+          <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
+          <div class="hover-meta">${t('card.usage', { count: s.usage.count, level: s.level })}</div>
+          <div class="hover-hint">${t('card.copyHint', { name: original })}</div>
         </div>
       </button>`;
   };
@@ -417,7 +421,7 @@ function renderHtml(webview, skills) {
     <section class="quickbar-section" id="quickbar-section">
       <header>
         <h3>Quick Bar</h3>
-        <span class="sub">(${unlockedSlots}/6 해금 · 진화로 +1)</span>
+        <span class="sub">${t('quickbar.unlockHint', { unlocked: unlockedSlots })}</span>
         <span class="group-line"></span>
       </header>
       <div class="quickbar" id="quickbar">
@@ -426,7 +430,7 @@ function renderHtml(webview, skills) {
           const locked = i >= unlockedSlots;
           if (locked) {
             const stageNeed = BUDDY_NAMES[i] || '';
-            return `<div class="qslot locked" data-slot="${i}" data-key="${key}" title="진화 ${stageNeed} 단계에서 해금">
+            return `<div class="qslot locked" data-slot="${i}" data-key="${key}" title="${t('quickbar.locked', { stage: stageNeed })}">
               <span class="qslot-key">${key}</span>
               <span class="qslot-lock">🔒</span>
             </div>`;
@@ -460,7 +464,7 @@ function renderHtml(webview, skills) {
     ? `<section class="group recent-group">
         <header>
           <span class="group-icon">⏱</span>
-          <h3>최근 사용</h3>
+          <h3>${t('section.recent')}</h3>
           <span class="sub">(top ${recents.length})</span>
           <span class="group-line"></span>
         </header>
@@ -474,7 +478,7 @@ function renderHtml(webview, skills) {
     ? `<section class="group hidden-group">
         <header>
           <span class="group-icon">👻</span>
-          <h3>숨김</h3>
+          <h3>${t('section.hidden')}</h3>
           <span class="sub">(${hiddenSkills.length})</span>
           <span class="group-line"></span>
         </header>
@@ -492,7 +496,7 @@ function renderHtml(webview, skills) {
                 data-alias="${escapeHtml(s.label)}"
                 data-note="${escapeHtml(s.note)}"
                 data-hidden="1">
-                <span class="edit-btn" title="편집">✎</span>
+                <span class="edit-btn" title="${t('card.edit')}">✎</span>
                 ${iconHtml}
                 <div class="skill-name">${escapeHtml(s.label)}</div>
               </button>`;
@@ -1419,6 +1423,29 @@ function renderHtml(webview, skills) {
   .btn:hover { border-color: var(--accent); }
   .btn-primary { background: var(--accent-2); color: #1a1f2c; border-color: #c2410c; font-weight: 600; }
   .btn-danger { color: var(--bad); border-color: var(--bad); }
+  .spark-search-input {
+    width: 100%;
+    margin-top: 4px;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--fg);
+    background: var(--tile-bg-2);
+    border: 1px solid var(--frame);
+    border-radius: 3px;
+    box-sizing: border-box;
+  }
+  .spark-search-input:focus { outline: 1px solid var(--accent); }
+  .locale-toggle {
+    background: transparent;
+    border: 1px solid var(--frame);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .locale-toggle:hover { border-color: var(--accent); }
   .spark-preset-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
@@ -1529,29 +1556,30 @@ function renderHtml(webview, skills) {
   <div class="toolbar">
     <div class="toolbar-search">
       <span class="bracket-l">[</span>
-      <input class="search" placeholder="검색창" id="search" />
+      <input class="search" placeholder="${t('toolbar.searchPh')}" id="search" />
       <span class="bracket-r">]</span>
     </div>
     <div class="toolbar-buttons">
-      <div class="sort-group" role="tablist" aria-label="정렬">
-        <button class="sort-btn active" data-sort="default" title="기본 정렬">☷</button>
-        <button class="sort-btn" data-sort="recent" title="최근 사용">⏱</button>
-        <button class="sort-btn" data-sort="usage" title="자주 사용">★</button>
+      <div class="sort-group" role="tablist" aria-label="${t('toolbar.sort')}">
+        <button class="sort-btn active" data-sort="default" title="${t('toolbar.sortDefault')}">☷</button>
+        <button class="sort-btn" data-sort="recent" title="${t('toolbar.sortRecent')}">⏱</button>
+        <button class="sort-btn" data-sort="usage" title="${t('toolbar.sortUsage')}">★</button>
       </div>
-      <button class="meta-btn" id="achv-btn" title="업적 보드">🏆</button>
-      <button class="meta-btn" id="report-btn" title="위클리 리포트">📊</button>
-      <button class="exec-mode-btn" id="exec-mode-btn" title="실행 방식">▶ Off</button>
-      <button class="sound-toggle" id="sound-toggle" title="사운드 on/off">♪</button>
-      <button class="scanlines-toggle" id="scanlines-toggle" title="CRT 효과 on/off">▦</button>
+      <button class="meta-btn" id="achv-btn" title="${t('toolbar.achievements')}">🏆</button>
+      <button class="meta-btn" id="report-btn" title="${t('toolbar.weeklyReport')}">📊</button>
+      <button class="exec-mode-btn" id="exec-mode-btn" title="${t('toolbar.execMode')}">▶ Off</button>
+      <button class="sound-toggle" id="sound-toggle" title="${t('toolbar.sound')}">♪</button>
+      <button class="scanlines-toggle" id="scanlines-toggle" title="${t('toolbar.scanlines')}">▦</button>
+      <button class="locale-toggle" id="locale-toggle" title="${t('toolbar.locale')}">🌐 ${locale.toUpperCase()}</button>
     </div>
   </div>
-  <div id="content">${quickbarHtml + recentSection + sections + hiddenSection || '<div class="empty">스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.</div>'}</div>
+  <div id="content">${quickbarHtml + recentSection + sections + hiddenSection || `<div class="empty">${t('panel.empty')}</div>`}</div>
   <div class="footer">
-    <span class="footer-streak" id="footer-streak">${meta.streak.days > 0 ? `🔥 ${meta.streak.days}일` : '🔥 0일'}</span>
+    <span class="footer-streak" id="footer-streak">🔥 ${t('footer.streakDays', { days: meta.streak.days || 0 })}</span>
     <span class="sep">|</span>
-    <span class="footer-total" id="footer-total">📊 ${meta.totalCopies}회</span>
+    <span class="footer-total" id="footer-total">📊 ${t('footer.totalCopies', { count: meta.totalCopies })}</span>
     <span class="sep">|</span>
-    <span id="footer-hint">클릭 → 복사 · 우클릭 → SKILL.md · ✎ → 편집</span>
+    <span id="footer-hint">${t('footer.hint')}</span>
   </div>
   <div class="toast" id="toast"></div>
   <div class="buddy-pet" id="buddy-pet" title="${escapeHtml(character.name)} — ${escapeHtml(character.stageName)}">
@@ -1560,58 +1588,62 @@ function renderHtml(webview, skills) {
 
   <div class="modal-bg" id="modal-bg">
     <div class="modal" id="modal">
-      <h4 id="modal-title">스킬 편집</h4>
-      <label>별칭(Alias)</label>
-      <input type="text" id="m-alias" placeholder="예: 오늘 시작" />
-      <label>설명 메모(Note)</label>
-      <textarea id="m-note" placeholder="이 스킬에 대한 개인 메모…"></textarea>
-      <label>아이콘</label>
+      <h4 id="modal-title">${t('modal.edit.title')}</h4>
+      <label>${t('modal.edit.alias')}</label>
+      <input type="text" id="m-alias" placeholder="${t('modal.edit.aliasPh')}" />
+      <label>${t('modal.edit.note')}</label>
+      <textarea id="m-note" placeholder="${t('modal.edit.notePh')}"></textarea>
+      <label>${t('modal.edit.icon')}</label>
       <div class="icon-row">
         <div class="icon-preview" id="m-icon-preview">
-          <div class="preview-empty">없음</div>
+          <div class="preview-empty">${t('modal.edit.iconNone')}</div>
           <div class="preview-size" id="m-icon-size"></div>
         </div>
         <div class="icon-actions">
-          <button class="btn" id="m-icon-upload" type="button">📤 업로드</button>
-          <button class="btn btn-danger" id="m-icon-clear" type="button">제거</button>
+          <button class="btn" id="m-icon-upload" type="button">${t('modal.edit.iconUpload')}</button>
+          <button class="btn btn-danger" id="m-icon-clear" type="button">${t('modal.edit.iconRemove')}</button>
         </div>
       </div>
-      <label style="margin-top:8px;">Spark 프리셋 <span class="hint">(클릭으로 선택)</span></label>
+      <label style="margin-top:8px;">${t('modal.edit.spark')} <span class="hint">${t('modal.edit.sparkHint')}</span></label>
+      <input type="text" id="m-spark-search" class="spark-search-input" placeholder="${t('modal.edit.sparkSearchPh')}" />
       <div class="spark-preset-grid" id="m-spark-grid" data-presets="${sparkPresetsJson}"></div>
       <div class="modal-row">
         <input type="checkbox" id="m-hidden" />
-        <label for="m-hidden" style="margin: 0; font-size: 11px; color: var(--fg);">패널에서 숨기기</label>
+        <label for="m-hidden" style="margin: 0; font-size: 11px; color: var(--fg);">${t('modal.edit.hide')}</label>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-danger" id="m-reset">초기화</button>
-        <button class="btn" id="m-cancel">취소</button>
-        <button class="btn btn-primary" id="m-save">저장</button>
+        <button class="btn btn-danger" id="m-reset">${t('modal.edit.reset')}</button>
+        <button class="btn" id="m-cancel">${t('modal.edit.cancel')}</button>
+        <button class="btn btn-primary" id="m-save">${t('modal.edit.save')}</button>
       </div>
     </div>
   </div>
 
   <div class="modal-bg" id="achv-bg">
     <div class="modal modal-wide">
-      <h4>🏆 업적 보드 <span class="hint">${achvStatus.filter(a => a.earned).length} / ${achvStatus.length}</span></h4>
+      <h4>${t('modal.achv.title')} <span class="hint">${achvStatus.filter(a => a.earned).length} / ${achvStatus.length}</span></h4>
       <div class="achv-grid">
-        ${achvStatus.map(a => `
-          <div class="achv ${a.earned ? 'unlocked' : 'locked'}" title="${escapeHtml(a.desc)}">
+        ${achvStatus.map(a => {
+          const aName = t(a.nameKey);
+          const aDesc = t(a.descKey);
+          return `
+          <div class="achv ${a.earned ? 'unlocked' : 'locked'}" title="${escapeHtml(aDesc)}">
             <div class="achv-icon">${a.icon}</div>
-            <div class="achv-name">${escapeHtml(a.name)}</div>
-            <div class="achv-desc">${escapeHtml(a.desc)}</div>
-            ${a.earned ? '<span class="achv-tag">달성</span>' : ''}
-          </div>
-        `).join('')}
+            <div class="achv-name">${escapeHtml(aName)}</div>
+            <div class="achv-desc">${escapeHtml(aDesc)}</div>
+            ${a.earned ? `<span class="achv-tag">${t('modal.achv.earned')}</span>` : ''}
+          </div>`;
+        }).join('')}
       </div>
       <div class="modal-actions">
-        <button class="btn" id="achv-close">닫기</button>
+        <button class="btn" id="achv-close">${t('modal.achv.close')}</button>
       </div>
     </div>
   </div>
 
   <div class="modal-bg" id="buddy-bg">
     <div class="modal modal-wide">
-      <h4>🪄 캐릭터 시트</h4>
+      <h4>${t('modal.buddy.title')}</h4>
       <div class="buddy-hero">
         <div class="buddy-portrait">
           ${buddyImg ? `<img src="${buddyImg}" alt="${escapeHtml(character.name)}" />` : '🥚'}
@@ -1619,7 +1651,7 @@ function renderHtml(webview, skills) {
         <div class="buddy-info">
           <div class="buddy-name-row">
             <input type="text" id="buddy-name-input" value="${escapeHtml(character.name)}" maxlength="20" />
-            <button class="btn" id="buddy-save-name">저장</button>
+            <button class="btn" id="buddy-save-name">${t('modal.buddy.save')}</button>
           </div>
           <div class="buddy-stage">${escapeHtml(character.stageName)} <span class="hint">(LV.${character.stage + 1}/7)</span></div>
           <div class="buddy-progress">
@@ -1634,10 +1666,10 @@ function renderHtml(webview, skills) {
       </div>
       <div class="buddy-stats">
         ${[
-          ['🧠 INT', 'int', '사고/계획/리뷰 스킬에서 성장'],
-          ['⚡ DEX', 'dex', 'Quick Bar는 2배'],
-          ['❤️ VIT', 'vit', '데일리 스트릭 매일 +1'],
-          ['🍀 LCK', 'lck', '업적 1개당 +5'],
+          ['🧠 INT', 'int', t('modal.buddy.statIntDesc')],
+          ['⚡ DEX', 'dex', t('modal.buddy.statDexDesc')],
+          ['❤️ VIT', 'vit', t('modal.buddy.statVitDesc')],
+          ['🍀 LCK', 'lck', t('modal.buddy.statLckDesc')],
         ].map(([label, key, hint]) => `
           <div class="buddy-stat" title="${hint}">
             <div class="stat-label">${label}</div>
@@ -1646,37 +1678,37 @@ function renderHtml(webview, skills) {
         `).join('')}
       </div>
       <div class="modal-actions">
-        <button class="btn" id="buddy-close">닫기</button>
+        <button class="btn" id="buddy-close">${t('modal.buddy.close')}</button>
       </div>
     </div>
   </div>
 
   <div class="modal-bg" id="report-bg">
     <div class="modal modal-wide">
-      <h4>📊 위클리 리포트</h4>
+      <h4>${t('modal.report.title')}</h4>
       <div class="report-stats">
         <div class="stat-card">
-          <div class="stat-label">이번 주 사용</div>
-          <div class="stat-value">${weekly.weekTotal}<span class="stat-unit">회</span></div>
+          <div class="stat-label">${t('modal.report.weekTotal')}</div>
+          <div class="stat-value">${weekly.weekTotal}<span class="stat-unit">${t('modal.report.unitCount')}</span></div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">스트릭</div>
-          <div class="stat-value">${weekly.streakDays}<span class="stat-unit">일</span></div>
+          <div class="stat-label">${t('modal.report.streak')}</div>
+          <div class="stat-value">${weekly.streakDays}<span class="stat-unit">${t('modal.report.unitDays')}</span></div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">전체 누적</div>
-          <div class="stat-value">${weekly.totalCopies}<span class="stat-unit">회</span></div>
+          <div class="stat-label">${t('modal.report.totalCopies')}</div>
+          <div class="stat-value">${weekly.totalCopies}<span class="stat-unit">${t('modal.report.unitCount')}</span></div>
         </div>
       </div>
       <div class="report-section">
-        <div class="report-title">최근 7일 활동</div>
+        <div class="report-title">${t('modal.report.recent7')}</div>
         <div class="day-bars">
           ${weekly.days.map((d, i) => {
             const c = weekly.counts[i];
             const max = Math.max(...weekly.counts, 1);
             const h = Math.round((c / max) * 100);
             const dayLabel = d.slice(5).replace('-', '/');
-            return `<div class="day-bar" title="${d} — ${c}회">
+            return `<div class="day-bar" title="${t('modal.report.dayTooltip', { date: d, count: c })}">
               <div class="day-bar-fill" style="height: ${h}%"></div>
               <div class="day-bar-count">${c || ''}</div>
               <div class="day-bar-label">${dayLabel}</div>
@@ -1686,29 +1718,44 @@ function renderHtml(webview, skills) {
       </div>
       ${weekly.topSkills.length ? `
       <div class="report-section">
-        <div class="report-title">이번 주 TOP 5</div>
+        <div class="report-title">${t('modal.report.top5')}</div>
         <ol class="top-skills">
-          ${weekly.topSkills.map((t, i) => `
+          ${weekly.topSkills.map((top, i) => `
             <li>
               <span class="rank">#${i + 1}</span>
-              <span class="top-name">${escapeHtml(t.label)}</span>
-              <span class="top-count">${t.count}회</span>
+              <span class="top-name">${escapeHtml(top.label)}</span>
+              <span class="top-count">${t('modal.report.topCount', { count: top.count })}</span>
             </li>
           `).join('')}
         </ol>
-      </div>` : `<div class="report-empty">이번 주 사용 기록이 없습니다.</div>`}
+      </div>` : `<div class="report-empty">${t('modal.report.empty')}</div>`}
       <div class="modal-actions">
-        <button class="btn" id="report-close">닫기</button>
+        <button class="btn" id="report-close">${t('modal.report.close')}</button>
       </div>
     </div>
   </div>
 
 <script>
 const vscode = acquireVsCodeApi();
+const STR = ${JSON.stringify(i18n.dict(locale))};
+const LOCALE = ${JSON.stringify(locale)};
+function t(key, vars) {
+  let s = STR[key];
+  if (s == null) s = key;
+  if (vars) s = s.replace(/\\{(\\w+)\\}/g, (m, k) => k in vars ? String(vars[k]) : m);
+  return s;
+}
 const search = document.getElementById('search');
 const toast = document.getElementById('toast');
 const soundBtn = document.getElementById('sound-toggle');
 const scanlinesBtn = document.getElementById('scanlines-toggle');
+const localeBtn = document.getElementById('locale-toggle');
+if (localeBtn) {
+  localeBtn.addEventListener('click', () => {
+    const next = LOCALE === 'ko' ? 'en' : 'ko';
+    vscode.postMessage({ type: 'setLocale', locale: next });
+  });
+}
 
 // ---- Game state (persisted in localStorage of webview) ----
 const STATE = (() => {
@@ -1772,9 +1819,9 @@ scanlinesBtn.addEventListener('click', () => {
 const EXEC_MODES = ['paste', 'auto', 'terminal'];
 const EXEC_LABELS = { paste: '▶ Paste', auto: '▶ Auto', terminal: '▶ Term' };
 const EXEC_NEXT_HINT = {
-  paste: '클립보드만 복사',
-  auto: '붙여넣기+엔터 자동 (mac/win/linux)',
-  terminal: '터미널 실행',
+  paste: t('exec.paste'),
+  auto: t('exec.auto'),
+  terminal: t('exec.terminal'),
 };
 const execBtn = document.getElementById('exec-mode-btn');
 function applyExecMode() {
@@ -1782,7 +1829,7 @@ function applyExecMode() {
   execBtn.textContent = EXEC_LABELS[m];
   execBtn.classList.remove('mode-paste', 'mode-terminal');
   if (m !== 'off') execBtn.classList.add('mode-' + m);
-  execBtn.title = '실행 방식: ' + EXEC_NEXT_HINT[m] + ' (클릭으로 변경)';
+  execBtn.title = t('exec.modeTitle', { hint: EXEC_NEXT_HINT[m] });
 }
 if (!STATE.execMode || STATE.execMode === 'off') STATE.execMode = 'paste';
 applyExecMode();
@@ -1860,7 +1907,7 @@ if (buddyPet) {
 document.getElementById('buddy-save-name').addEventListener('click', () => {
   const name = document.getElementById('buddy-name-input').value.trim();
   vscode.postMessage({ type: 'setBuddyName', name });
-  showToast('이름 저장: ' + name);
+  showToast(t('toast.buddyName', { name }));
   sfxClick();
 });
 const modalBg = document.getElementById('modal-bg');
@@ -1882,6 +1929,7 @@ let pendingIconClear = false;
 let pendingSparkIcon = null;
 const iconSizeEl = document.getElementById('m-icon-size');
 const sparkGrid = document.getElementById('m-spark-grid');
+const sparkSearch = document.getElementById('m-spark-search');
 
 // Build spark preset grid
 (function() {
@@ -1900,6 +1948,15 @@ const sparkGrid = document.getElementById('m-spark-grid');
       setIconPreview(btn.querySelector('img').src, '36×36');
     });
   });
+  if (sparkSearch) {
+    sparkSearch.addEventListener('input', () => {
+      const q = sparkSearch.value.trim().toLowerCase();
+      sparkGrid.querySelectorAll('.spark-preset-btn').forEach(btn => {
+        const match = !q || btn.dataset.name.toLowerCase().includes(q);
+        btn.style.display = match ? '' : 'none';
+      });
+    });
+  }
 })();
 function setIconPreview(uri, sizeText) {
   const preview = document.getElementById('m-icon-preview');
@@ -1916,12 +1973,12 @@ function setIconPreview(uri, sizeText) {
       };
     }
   } else {
-    preview.innerHTML = '<div class="preview-empty">없음</div><div class="preview-size"></div>';
+    preview.innerHTML = '<div class="preview-empty">' + t('modal.edit.iconNone') + '</div><div class="preview-size"></div>';
   }
 }
 function openEditModal(el) {
   editingSkill = el.dataset.name;
-  mTitle.textContent = '스킬 편집 — /' + editingSkill;
+  mTitle.textContent = t('modal.edit.titleFormat', { name: editingSkill });
   mAlias.value = el.dataset.alias && el.dataset.alias !== editingSkill ? el.dataset.alias : '';
   mNote.value = el.dataset.note || '';
   mHidden.checked = el.dataset.hidden === '1';
@@ -1932,7 +1989,9 @@ function openEditModal(el) {
   const currentSpark = el.dataset.sparkIcon || '';
   sparkGrid.querySelectorAll('.spark-preset-btn').forEach(b => {
     b.classList.toggle('selected', b.dataset.name === currentSpark);
+    b.style.display = '';
   });
+  if (sparkSearch) sparkSearch.value = '';
   modalBg.classList.add('show');
   setTimeout(() => mAlias.focus(), 50);
 }
@@ -1964,7 +2023,7 @@ document.getElementById('m-icon-upload').addEventListener('click', () => {
 document.getElementById('m-icon-clear').addEventListener('click', () => {
   pendingIconClear = true;
   setIconPreview('');
-  showToast('저장 시 아이콘 제거됩니다');
+  showToast(t('toast.iconRemoveOnSave'));
 });
 window.addEventListener('message', (e) => {
   const m = e.data;
@@ -2012,14 +2071,14 @@ window.addEventListener('message', (e) => {
     // update footer
     const streakEl = document.getElementById('footer-streak');
     const totalEl = document.getElementById('footer-total');
-    if (streakEl) streakEl.textContent = '🔥 ' + m.streak + '일';
-    if (totalEl) totalEl.textContent = '📊 ' + m.totalCopies + '회';
+    if (streakEl) streakEl.textContent = '🔥 ' + t('footer.streakDays', { days: m.streak });
+    if (totalEl) totalEl.textContent = '📊 ' + t('footer.totalCopies', { count: m.totalCopies });
 
     // Buddy stage-up celebration
     if (m.buddy && m.buddy.nextStage > m.buddy.prevStage) {
       const stageName = m.buddy.stageName;
       setTimeout(() => {
-        showToast('🎉 ' + (m.buddy.character.name || 'Claude') + ' 진화: ' + stageName + '!');
+        showToast(t('toast.evolution', { name: m.buddy.character.name || 'Claude', stage: stageName }));
         beep({ freq: 523, duration: 0.12, vol: 0.08 });
         setTimeout(() => beep({ freq: 659, duration: 0.12, vol: 0.08 }), 130);
         setTimeout(() => beep({ freq: 784, duration: 0.12, vol: 0.08 }), 260);
@@ -2048,14 +2107,14 @@ window.addEventListener('message', (e) => {
 });
 
 function showAchvToast(a) {
-  const t = document.getElementById('toast');
-  t.classList.add('achv-unlock');
-  t.textContent = '🏆 업적 해제: ' + a.icon + ' ' + a.name;
-  t.classList.add('show');
+  const el = document.getElementById('toast');
+  el.classList.add('achv-unlock');
+  el.textContent = t('toast.achievement', { icon: a.icon, name: t(a.nameKey) });
+  el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
-    t.classList.remove('show');
-    setTimeout(() => t.classList.remove('achv-unlock'), 200);
+    el.classList.remove('show');
+    setTimeout(() => el.classList.remove('achv-unlock'), 200);
   }, 2400);
 }
 
@@ -2092,7 +2151,7 @@ applySort();
 // ---- Quick Bar interactions ----
 function triggerSkill(name, file, opts) {
   vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
-  const prefix = ({ paste: '복사', auto: '자동 실행', terminal: '터미널' })[STATE.execMode] || '복사';
+  const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
   showToast('▶ ' + prefix + ': /' + name);
   sfxCopy();
   if (opts && opts.element) {
@@ -2106,13 +2165,13 @@ document.querySelectorAll('.qslot').forEach((slot) => {
   slot.addEventListener('mouseenter', () => { if (!isLocked()) sfxHover(); });
   slot.addEventListener('click', () => {
     if (isLocked()) {
-      showToast('🔒 진화로 해금');
+      showToast(t('toast.locked'));
       return;
     }
     if (slot.classList.contains('filled')) {
       triggerSkill(slot.dataset.name, slot.dataset.file, { element: slot });
     } else {
-      showToast('드래그해서 등록 · 키 ' + slot.dataset.key);
+      showToast(t('toast.dragHint', { key: slot.dataset.key }));
     }
   });
   slot.addEventListener('contextmenu', (e) => {
@@ -2121,7 +2180,7 @@ document.querySelectorAll('.qslot').forEach((slot) => {
     if (slot.classList.contains('filled')) {
       vscode.postMessage({ type: 'setQuickbar', slot: parseInt(slot.dataset.slot, 10), name: null });
       sfxClick();
-      showToast('슬롯 ' + slot.dataset.key + ' 비움');
+      showToast(t('toast.slotEmpty', { key: slot.dataset.key }));
     }
   });
   slot.addEventListener('dragover', (e) => {
@@ -2139,7 +2198,7 @@ document.querySelectorAll('.qslot').forEach((slot) => {
     if (!name) return;
     vscode.postMessage({ type: 'setQuickbar', slot: parseInt(slot.dataset.slot, 10), name });
     sfxOpen();
-    showToast('슬롯 ' + slot.dataset.key + ' 등록: /' + name);
+    showToast(t('toast.slotRegistered', { key: slot.dataset.key, name }));
   });
 });
 
@@ -2190,7 +2249,7 @@ document.querySelectorAll('.skill').forEach((el) => {
     sfxCopy();
     petToCard(el);
     setTimeout(() => el.classList.remove('copied'), 600);
-    const prefix = ({ paste: '복사', auto: '자동 실행', terminal: '터미널' })[STATE.execMode] || '복사';
+    const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
     showToast('▶ ' + prefix + ': /' + name);
   });
   el.addEventListener('contextmenu', (e) => {
@@ -2283,10 +2342,13 @@ class SkillsViewProvider {
         if (Object.keys(cfg.skills[msg.name]).length === 0) delete cfg.skills[msg.name];
         userConfig.write(cfg);
         this.refresh();
+      } else if (msg.type === 'setLocale' && msg.locale) {
+        userConfig.setLocale(msg.locale);
+        this.refresh();
       } else if (msg.type === 'pickIcon' && msg.name) {
         const picked = await vscode.window.showOpenDialog({
           canSelectMany: false,
-          openLabel: '아이콘 선택',
+          openLabel: i18n.tFor(i18n.resolveLocale(userConfig.getLocale(), vscode.env.language))('dialog.iconOpenLabel'),
           filters: { Images: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'] },
         });
         if (!picked || !picked[0]) return;
@@ -2363,7 +2425,12 @@ function activate(context) {
         const meta = userConfig.getMeta();
         const name = meta.quickbar && meta.quickbar[slotIndex];
         if (!name) {
-          vscode.window.showInformationMessage(`Quick Slot ${slotIndex + 1} 비어있음`);
+          vscode.window.showInformationMessage(
+            i18n.tFor(i18n.resolveLocale(userConfig.getLocale(), vscode.env.language))(
+              'status.quickSlotEmpty',
+              { n: slotIndex + 1 }
+            )
+          );
           return;
         }
         await vscode.env.clipboard.writeText('/' + name);
