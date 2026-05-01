@@ -94,18 +94,34 @@ All settings saved to `~/.claude/skills-panel-config.json` — version-controlla
 
 ---
 
-### 🐾 Claude Buddy
+### 🐾 Claude Skills Buddies — class-branch evolution
 
-A pixel-art companion that grows as you use skills. Wanders freely around the panel and runs toward the card you just clicked.
+A pixel-art companion that **branches into one of 10 RPG classes** based on your most-used slash-command category. Everyone starts the same; your usage decides who you become.
 
-| Stage | Threshold | Name |
+![Buddy lineup](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
+
+| Stage | Threshold | Result |
 |---|---|---|
-| 0 | 0 actions | 🥚 Egg |
-| 1 | 10+ | 🟢 Hatchling |
-| 2 | 30+ | 🐱 Kitten |
-| 3 | 100+ | 🐈 Cat |
-| 4 | 300+ | 🐒 Monkey |
-| 5 | 1000+ | 🐲 Dragon |
+| LV.1 Egg | 0 actions | common |
+| LV.2 Hatchling | 10+ | common |
+| **LV.3 [Class]** | **50+** | **branch — class is locked here from your skill usage** |
+| LV.4 [Class] Adept | 150+ | same class, stronger aura |
+| LV.5 [Class] Master | 500+ | final form |
+
+| Class | Role | Triggers on slash commands containing… |
+|---|---|---|
+| **Codey** 🗡️ | Swordsman | `code`, `refactor`, `simpl`, `implement` |
+| **Docly** 📜 | Cleric | `doc`, `write`, `markdown`, `readme` |
+| **Debuggo** 🔍 | Detective | `debug`, `bug`, `fix`, `trace` |
+| **Testra** 🛡️ | Paladin | `test`, `spec`, `verify`, `check`, `review` |
+| **Sheety** 📊 | Merchant | `xlsx`, `csv`, `sheet`, `excel` |
+| **Slidey** 🎤 | Bard | `slide`, `pptx`, `present` |
+| **PDFox** 🦊 | Rogue | `pdf` |
+| **Webbie** 🕸️ | Wizard | `web`, `frontend`, `css`, `react`, `figma` |
+| **Datia** 🧙‍♀️ | Astrologer | `analyze`, `chart`, `metric`, `dashboard` |
+| **Gitto** ⚔️ | Ninja | `git`, `commit`, `branch`, `push`, `pr`, `merge` |
+
+Don't like your class? Hit **🔄 Reincarnate** — the locked class clears, your counts stay, and the next action picks fresh.
 
 **Stats**: 🧠 INT (brainstorm/review skills) · ⚡ DEX (Quick Bar usage) · ❤️ VIT (daily streak) · 🍀 LCK (achievements)
 

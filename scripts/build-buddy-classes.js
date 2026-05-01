@@ -279,15 +279,19 @@ function gridToSvg(c) {
 }
 
 async function build() {
+  let placeholdersBuilt = 0;
+  let skippedArtist = 0;
   for (const c of CLASSES) {
     const finalPng = path.join(OUT, `${c.id}.png`);
     // If a real artist-supplied PNG already exists at the same path, leave it.
-    // We only emit placeholders for classes that don't have one yet.
+    // Placeholder PNGs from this script render to ~400–500 bytes; the artist
+    // PNGs delivered for v0.30 are 800–1200 bytes. 700 bytes splits cleanly.
     if (fs.existsSync(finalPng)) {
       const stat = fs.statSync(finalPng);
-      // Heuristic: artist PNGs are typically >2KB; our placeholder SVG renders
-      // to ~1KB. Skip real ones.
-      if (stat.size > 2000) continue;
+      if (stat.size > 700) {
+        skippedArtist++;
+        continue;
+      }
     }
     const svg = gridToSvg(c);
     fs.writeFileSync(path.join(OUT, `${c.id}.svg`), svg);
@@ -295,8 +299,9 @@ async function build() {
       .resize(PNG, PNG, { kernel: sharp.kernel.nearest })
       .png()
       .toFile(finalPng);
+    placeholdersBuilt++;
   }
-  console.log(`built ${CLASSES.length} placeholder class buddies`);
+  console.log(`built ${placeholdersBuilt} placeholder class buddies, kept ${skippedArtist} artist PNGs`);
 }
 
 build().catch((e) => { console.error(e); process.exit(1); });

@@ -2,6 +2,24 @@
 
 All notable changes to this extension are documented here.
 
+## [0.30.0] — 2026-05-01
+
+### Added — Final buddy class artwork
+
+The 10 placeholder class sprites shipped in v0.29.0 are replaced with the real artist designs:
+
+- Codey 🗡️ (Swordsman) · Docly 📜 (Cleric) · Debuggo 🔍 (Detective)
+- Testra 🛡️ (Paladin) · Sheety 📊 (Merchant) · Slidey 🎤 (Bard)
+- PDFox 🦊 (Rogue) · Webbie 🕸️ (Wizard) · Datia 🧙‍♀️ (Astrologer) · Gitto ⚔️ (Ninja)
+
+`docs/screenshots/buddy-lineup.png` — full lineup card (now linked from the README's Buddy section as a hero image for the Marketplace listing).
+
+### Build pipeline
+- `scripts/build-buddy-classes.js` skip threshold lowered to 700 bytes so future placeholder rebuilds correctly identify and skip the artist PNGs (~900–1200 bytes) without overwriting them. Placeholder SVGs no longer regenerate when an artist PNG is in place.
+
+### README
+- Buddy section completely rewritten to reflect the class-branch system (the lineup image, the 5-stage table, the 10 class table with their trigger keywords, the Reincarnate option).
+
 ## [0.29.0] — 2026-05-01
 
 ### Buddy system: class-branch evolution
