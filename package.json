@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "The fastest way to use Claude Code slash commands. Auto-discovers every /command, /skill, and installed plugin (superpowers, code-review, …). One click to copy or run. Aliases, custom groups, Quick Bar (keys 1–6), achievements, themes, fuzzy search. English · 한국어.",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",

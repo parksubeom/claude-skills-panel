@@ -918,6 +918,56 @@ function renderHtml(webview, skills) {
     50% { opacity: 1; transform: scale(1); }
     100% { opacity: 0; transform: scale(0.5); }
   }
+  /* Click ripple — expanding pixel ring */
+  @keyframes ripple {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.7; }
+    100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+  }
+  .ripple {
+    position: absolute;
+    width: 60px; height: 60px;
+    border: 2px solid var(--accent);
+    border-radius: 0;
+    pointer-events: none;
+    animation: ripple 0.5s ease-out forwards;
+    z-index: 6;
+    clip-path: polygon(0 6px, 6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  /* Hover sparkle particles — short-lived */
+  @keyframes particle {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+    20% { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.1); }
+  }
+  .particle {
+    position: absolute;
+    color: var(--accent);
+    font-size: 10px;
+    pointer-events: none;
+    animation: particle 0.55s ease-out forwards;
+    text-shadow: 0 0 4px var(--accent-2);
+    z-index: 7;
+  }
+  /* Quick Bar slot pulse on register/swap */
+  @keyframes slot-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.0), inset 0 0 0 0 rgba(125, 211, 252, 0); }
+    30% { box-shadow: 0 0 16px 4px rgba(125, 211, 252, 0.6), inset 0 0 12px rgba(125, 211, 252, 0.4); }
+    100% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0), inset 0 0 0 0 rgba(125, 211, 252, 0); }
+  }
+  .qslot.pulsed { animation: slot-pulse 0.55s ease-out; }
+  /* Achievement unlock screen flash */
+  @keyframes achv-flash {
+    0% { opacity: 0; }
+    20% { opacity: 0.5; }
+    100% { opacity: 0; }
+  }
+  .achv-flash {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.6), transparent 60%);
+    pointer-events: none;
+    animation: achv-flash 0.7s ease-out forwards;
+    z-index: 999;
+  }
   .skill {
     all: unset;
     cursor: pointer;
@@ -2624,6 +2674,60 @@ const mGroup = document.getElementById('m-group');
 let toastTimer;
 let editingSkill = null;
 
+// Visual flourishes — kept in JS so they only fire on real interactions
+// (CSS-only :hover would re-fire too aggressively and clutter the screen).
+function spawnRipple(el, evt) {
+  const rect = el.getBoundingClientRect();
+  // Anchor near the click point, fall back to center
+  const x = evt && evt.clientX ? evt.clientX - rect.left : rect.width / 2;
+  const y = evt && evt.clientY ? evt.clientY - rect.top : rect.height / 2;
+  const r = document.createElement('span');
+  r.className = 'ripple';
+  r.style.left = x + 'px';
+  r.style.top = y + 'px';
+  el.appendChild(r);
+  setTimeout(() => r.remove(), 520);
+}
+const PARTICLE_GLYPHS = ['✦', '✧', '⋆', '·', '◆'];
+let particleCooldown = 0;
+function spawnHoverParticles(el) {
+  // Throttle so dragging across a grid doesn't cause hundreds of nodes
+  const now = Date.now();
+  if (now - particleCooldown < 220) return;
+  particleCooldown = now;
+  const rect = el.getBoundingClientRect();
+  const count = 4 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    p.textContent = PARTICLE_GLYPHS[Math.floor(Math.random() * PARTICLE_GLYPHS.length)];
+    const startX = Math.random() * rect.width;
+    const startY = Math.random() * rect.height;
+    const dx = (Math.random() - 0.5) * 30;
+    const dy = -10 - Math.random() * 18;
+    p.style.left = startX + 'px';
+    p.style.top = startY + 'px';
+    p.style.setProperty('--dx', dx + 'px');
+    p.style.setProperty('--dy', dy + 'px');
+    el.appendChild(p);
+    setTimeout(() => p.remove(), 600);
+  }
+}
+function pulseSlot(slot) {
+  if (!slot) return;
+  slot.classList.remove('pulsed');
+  // Force reflow so the same class re-triggers the animation
+  void slot.offsetWidth;
+  slot.classList.add('pulsed');
+  setTimeout(() => slot.classList.remove('pulsed'), 600);
+}
+function flashAchievement() {
+  const f = document.createElement('div');
+  f.className = 'achv-flash';
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 720);
+}
+
 function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
@@ -2831,6 +2935,7 @@ function showAchvToast(a) {
   el.classList.add('achv-unlock');
   el.textContent = t('toast.achievement', { icon: a.icon, name: t(a.nameKey) });
   el.classList.add('show');
+  flashAchievement();
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.classList.remove('show');
@@ -2878,6 +2983,7 @@ function triggerSkill(name, file, opts) {
     opts.element.classList.add('copied');
     setTimeout(() => opts.element.classList.remove('copied'), 600);
     petToCard(opts.element);
+    spawnRipple(opts.element, opts.event);
   }
 }
 // Track in-flight slot drag (DataTransfer.types is only readable in dragenter/over,
@@ -2956,12 +3062,14 @@ document.querySelectorAll('.qslot').forEach((slot) => {
       if (fromIdx === toIdx) return;
       vscode.postMessage({ type: 'swapQuickbar', from: fromIdx, to: toIdx });
       sfxOpen();
+      pulseSlot(slot);
       return;
     }
     const name = e.dataTransfer.getData('text/plain');
     if (!name) return;
     vscode.postMessage({ type: 'setQuickbar', slot: toIdx, name });
     sfxOpen();
+    pulseSlot(slot);
     showToast(t('toast.slotRegistered', { key: slot.dataset.key, name }));
   });
 });
@@ -2999,7 +3107,7 @@ document.querySelectorAll('.skill').forEach((el) => {
     el.classList.add('dragging');
   });
   el.addEventListener('dragend', () => el.classList.remove('dragging'));
-  el.addEventListener('mouseenter', () => sfxHover());
+  el.addEventListener('mouseenter', () => { sfxHover(); spawnHoverParticles(el); });
   el.addEventListener('click', (e) => {
     if (e.target.classList.contains('edit-btn')) {
       e.stopPropagation();
@@ -3012,6 +3120,7 @@ document.querySelectorAll('.skill').forEach((el) => {
     el.classList.add('copied');
     sfxCopy();
     petToCard(el);
+    spawnRipple(el, e);
     setTimeout(() => el.classList.remove('copied'), 600);
     const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
     showToast('▶ ' + prefix + ': /' + name);

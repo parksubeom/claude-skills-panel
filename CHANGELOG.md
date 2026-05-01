@@ -2,6 +2,17 @@
 
 All notable changes to this extension are documented here.
 
+## [0.26.0] — 2026-05-01
+
+### Added — Visual polish (every interaction now has a tactile response)
+- **Click ripple** — clicking a card or Quick Bar slot spawns an expanding pixel ring anchored at the click point.
+- **Hover sparkle particles** — 4–6 random pixel glyphs (`✦ ✧ ⋆ · ◆`) burst from a card on `mouseenter`, throttled at ~5 fps so dragging doesn't flood the DOM.
+- **Quick Bar pulse** — slot glows when it receives a card, swaps with another slot, or is registered via keyboard.
+- **Achievement unlock screen flash** — a soft amber radial flash overlays the panel each time an achievement fires its toast, layered with the existing 3-note chime.
+
+### Why
+Every move the user makes now produces a small visual confirmation. The 6–10 second demo GIF (recipe in `docs/MAKING_DEMO_GIF.md`) is what converts marketplace impressions into installs, and these flourishes are deliberately recordable.
+
 ## [0.25.0] — 2026-05-01
 
 ### Added — Plugin Marketplace Browser
