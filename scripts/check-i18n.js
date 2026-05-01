@@ -43,33 +43,37 @@ while ((m = re.exec(ext))) referenced.add(m[1]);
 const DOM_TAGS = new Set(['span', 'div', 'a', 'img', 'p', 'h3', 'h4', 'br']);
 const realRefs = [...referenced].filter((k) => !DOM_TAGS.has(k) && k.includes('.'));
 
-const en = i18n.STRINGS.en;
-const ko = i18n.STRINGS.ko;
-const missingEn = realRefs.filter((k) => !(k in en));
-const missingKo = realRefs.filter((k) => !(k in ko));
-if (missingEn.length) {
-  fail(`Referenced keys missing in EN locale (${missingEn.length}): ${missingEn.slice(0, 8).join(', ')}${missingEn.length > 8 ? ', …' : ''}`);
-} else {
-  ok(`All ${realRefs.length} referenced keys exist in EN`);
-}
-if (missingKo.length) {
-  fail(`Referenced keys missing in KO locale (${missingKo.length}): ${missingKo.slice(0, 8).join(', ')}${missingKo.length > 8 ? ', …' : ''}`);
-} else {
-  ok(`All ${realRefs.length} referenced keys exist in KO`);
+// Check that every referenced key exists in every supported locale
+for (const loc of i18n.SUPPORTED) {
+  const dict = i18n.STRINGS[loc];
+  if (!dict) {
+    fail(`SUPPORTED includes ${loc} but STRINGS.${loc} is missing`);
+    continue;
+  }
+  const missing = realRefs.filter((k) => !(k in dict));
+  if (missing.length) {
+    fail(`Referenced keys missing in ${loc.toUpperCase()} locale (${missing.length}): ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ', …' : ''}`);
+  } else {
+    ok(`All ${realRefs.length} referenced keys exist in ${loc.toUpperCase()}`);
+  }
 }
 
-// 3. EN/KO key set parity
-const enKeys = new Set(Object.keys(en));
-const koKeys = new Set(Object.keys(ko));
-const enOnly = [...enKeys].filter((k) => !koKeys.has(k));
-const koOnly = [...koKeys].filter((k) => !enKeys.has(k));
-if (enOnly.length) {
-  fail(`Keys defined in EN only (${enOnly.length}): ${enOnly.slice(0, 8).join(', ')}${enOnly.length > 8 ? ', …' : ''}`);
-} else {
-  ok(`EN and KO contain the same keys (${enKeys.size})`);
-}
-if (koOnly.length) {
-  fail(`Keys defined in KO only (${koOnly.length}): ${koOnly.slice(0, 8).join(', ')}${koOnly.length > 8 ? ', …' : ''}`);
+// Check that every locale has the same key set as EN (canonical source)
+const enKeys = new Set(Object.keys(i18n.STRINGS.en));
+for (const loc of i18n.SUPPORTED) {
+  if (loc === 'en') continue;
+  const locKeys = new Set(Object.keys(i18n.STRINGS[loc] || {}));
+  const enOnly = [...enKeys].filter((k) => !locKeys.has(k));
+  const locOnly = [...locKeys].filter((k) => !enKeys.has(k));
+  if (enOnly.length) {
+    fail(`Keys in EN but not ${loc.toUpperCase()} (${enOnly.length}): ${enOnly.slice(0, 8).join(', ')}${enOnly.length > 8 ? ', …' : ''}`);
+  }
+  if (locOnly.length) {
+    fail(`Keys in ${loc.toUpperCase()} but not EN (${locOnly.length}): ${locOnly.slice(0, 8).join(', ')}${locOnly.length > 8 ? ', …' : ''}`);
+  }
+  if (!enOnly.length && !locOnly.length) {
+    ok(`EN and ${loc.toUpperCase()} contain the same keys (${enKeys.size})`);
+  }
 }
 
 if (failed) {

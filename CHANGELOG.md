@@ -2,6 +2,24 @@
 
 All notable changes to this extension are documented here.
 
+## [0.27.0] — 2026-05-01
+
+### Added — Japanese (ja) locale
+- Full ja translation across all 183 keys (parity with en/ko).
+- `i18n.SUPPORTED` now lists `['en', 'ko', 'ja']`. The 🌐 toggle cycles through all three. `vscode.env.language === 'ja'` auto-detects on first run.
+- `scripts/check-i18n.js` now iterates over `i18n.SUPPORTED` instead of hard-coding en/ko, so adding a fourth locale is just a strings.js edit.
+
+### Added — Marketing assets (docs/marketing/)
+- `README.md` — index with recommended posting timeline (T+0 → T+1m).
+- `SCREENSHOT_PLAN.md` — 6 essential screenshots with composition + tooling notes.
+- `X_TWITTER.md` — V0 single tweet + V1 7-tweet thread, en + ko.
+- `REDDIT_HN.md` — Show HN, r/ClaudeAI, r/vscode, r/cursor copy with anticipated comment templates.
+- `PRODUCT_HUNT.md` — final tagline, descriptions (short + long), maker comment, 30 prepared Q&A.
+- `BLOG_OUTLINE.md` — three blog post outlines (1-week build retro, marketplace deep-dive, gamification design).
+
+### Note
+Code changes are minimal in this version — the work is in marketing infra so the existing v0.22–v0.26 features can actually be discovered. The marketing docs are designed to be copy-paste-ready.
+
 ## [0.26.0] — 2026-05-01
 
 ### Added — Visual polish (every interaction now has a tactile response)
