@@ -64,98 +64,12 @@ const STAGES = [
       '................',
     ],
   },
-  // 2 — CREAM CAT (30~99): small cream-colored cat, thin tail (ref #4)
-  {
-    id: 2, name: 'Kitten', threshold: 30,
-    K: '#0b0d12', W: '#dcd0b8', A: '#0b0d12', B: '#9c8e74',
-    grid: [
-      '................',
-      '......K....K....',
-      '.....KWK..KWK...',
-      '.....KWWKKWWK...',
-      '....KWWWWWWWK...',
-      '....KWAKKKAWK...',
-      '....KKKKKKKKK...',
-      '...KWWWWWWWWK...',
-      '...KWWWWWWWWK...',
-      '...KWWWWWWWWKK..',
-      '...KWWWWWWWWWK..',
-      '...KWWWWWWWWK...',
-      '....KK..KK....K.',
-      '....K...K....KK.',
-      '................',
-      '................',
-    ],
-  },
-  // 3 — GREY CAT (100~299): bigger grey cat, fluffy tail (ref #5)
-  {
-    id: 3, name: 'Cat', threshold: 100,
-    K: '#0b0d12', W: '#9aa3b3', A: '#0b0d12', B: '#5a6273',
-    grid: [
-      '................',
-      '......K....K....',
-      '.....KWK..KWK...',
-      '.....KWWKKWWK...',
-      '....KWWWWWWWK...',
-      '....KWAKKKAWK...',
-      '....KKKKKKKKK...',
-      '...KWWWWWWWWKKK.',
-      '...KWWWWWWWWBBK.',
-      '...KWWWWWWWWBBK.',
-      '...KWWWWWWWWWBK.',
-      '...KWWWWWWWWBK..',
-      '....KK..KK..BK..',
-      '....K....K..K...',
-      '................',
-      '................',
-    ],
-  },
-  // 4 — MONKEY (300~999): brown monkey with tan face (ref #6)
-  {
-    id: 4, name: 'Monkey', threshold: 300,
-    K: '#0b0d12', W: '#854d2a', A: '#f4d4a3', B: '#0b0d12',
-    grid: [
-      '................',
-      '....KKKKKKKK....',
-      '...KWWWWWWWWK...',
-      '...KWAAAAAAWK...',
-      '...KWAKAKAAWK...',
-      '...KWAAAAAAWK...',
-      '....KAAAAAAK....',
-      '....KKKKKKKK....',
-      '...KWWWWWWWWK...',
-      '...KWWWWWWWWK...',
-      '...KWWWWWWWWK...',
-      '...KWWWWWWWWK...',
-      '....KK....KK....',
-      '....KW....WK....',
-      '....KK....KK....',
-      '................',
-    ],
-  },
-  // 5 — DRAGON (1000+): blue dragon with horns (ref #1)
-  {
-    id: 5, name: 'Dragon', threshold: 1000,
-    K: '#0b0d12', W: '#3a7be0', A: '#fbbf24', B: '#1e40af',
-    grid: [
-      '................',
-      '....K.K..K.K....',
-      '....KAK..KAK....',
-      '...KKWKKKKWKK...',
-      '...KWWWWWWWWK...',
-      '...KWAKWWWAWK...',
-      '...KWWWWWWWWK...',
-      '....KKKKKKKKKK..',
-      '...KWWWWWWWWWWK.',
-      '..KWWWWWWWWWWWK.',
-      '..KKWWWWWWWWWBK.',
-      '...KKKKWWWBBBK..',
-      '......KKK..K....',
-      '....KK.K..KK....',
-      '................',
-      '................',
-    ],
-  },
+  // Stages 2-5 (Kitten/Cat/Monkey/Dragon) were the legacy single-evolution
+  // sprites used before v0.29's class-branch system. They were never read
+  // at runtime once each of the 10 classes had artwork, so the PNG/SVG
+  // outputs were removed in v0.33 and the grid definitions deleted here
+  // to keep the build pipeline honest. LV.3+ now resolves through
+  // assets/pixel-icons/buddy/class/<id>.png exclusively.
 ];
 
 function rectFor(x, y, color) {
@@ -184,8 +98,13 @@ function gridToSvg(stage) {
 }
 
 async function build() {
-  // Clean any old stage6 (legacy 7-stage system)
-  for (const fname of ['stage6.png', 'stage6.svg']) {
+  // Clean legacy outputs from earlier sprite systems:
+  //   - stage6.* — original 7-stage system
+  //   - stage2-5.* — pre-class-branch single-evolution sprites (v0.29)
+  const legacy = ['stage6.png', 'stage6.svg', 'stage2.png', 'stage2.svg',
+                  'stage3.png', 'stage3.svg', 'stage4.png', 'stage4.svg',
+                  'stage5.png', 'stage5.svg'];
+  for (const fname of legacy) {
     const f = path.join(OUT, fname);
     if (fs.existsSync(f)) fs.unlinkSync(f);
   }

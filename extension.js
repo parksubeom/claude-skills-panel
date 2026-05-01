@@ -432,15 +432,17 @@ function renderHtml(webview, skills) {
   // Falls back gracefully if a class PNG hasn't been delivered by the designer yet.
   const buddyImg = (() => {
     if (!PIXEL_DIR) return null;
-    let candidates;
+    // LV.1/2 share the common Egg/Hatchling sprites. LV.3+ resolves to the
+    // artist-supplied class PNG (10 are shipped). If the user is past the
+    // branch threshold but somehow has no class set yet, fall back to the
+    // Hatchling sprite — getCharacter() will assign a class on the next read.
+    const candidates = [];
     if (character.stage <= 1 || !character.class) {
-      candidates = [`buddy/stage${character.stage}.png`, 'buddy/stage0.png'];
+      candidates.push(`buddy/stage${character.stage}.png`);
+      candidates.push('buddy/stage0.png');
     } else {
-      candidates = [
-        `buddy/class/${character.class}.png`,
-        `buddy/stage${character.stage}.png`,
-        'buddy/stage5.png',
-      ];
+      candidates.push(`buddy/class/${character.class}.png`);
+      candidates.push('buddy/stage1.png'); // last-resort fallback
     }
     for (const rel of candidates) {
       const abs = path.join(PIXEL_DIR, rel);

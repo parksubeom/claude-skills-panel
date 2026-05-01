@@ -2,6 +2,19 @@
 
 All notable changes to this extension are documented here.
 
+## [0.33.0] — 2026-05-01
+
+### Removed — unused legacy buddy sprites
+
+The pre-v0.29 single-evolution buddy line (Kitten, Cat, Monkey, Dragon at `buddy/stage{2..5}.png`) was kept around as a fallback when class PNGs were still placeholders. With all 10 artist class PNGs in place since v0.30, those four stages were dead weight.
+
+- `assets/pixel-icons/buddy/stage{2,3,4,5}.{png,svg}` deleted (8 files).
+- `scripts/build-buddy-icons.js` no longer ships their grid definitions; the legacy-cleanup loop at the top of `build()` will remove them automatically if they reappear from a stale build.
+- `extension.js` buddy sprite resolver simplified — the `stage5.png` last-resort fallback (which only fired when both the class PNG and the stage PNG were missing) is replaced by `stage1.png` (Hatchling), which is always shipped.
+- `stages.json` now lists only Egg and Hatchling.
+
+Behavior is unchanged: LV.1 → Egg, LV.2 → Hatchling, LV.3+ → class PNG.
+
 ## [0.32.0] — 2026-05-01
 
 ### Added — Chinese (zh) locale + extra discovery surface

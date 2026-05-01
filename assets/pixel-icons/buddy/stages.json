@@ -8,25 +8,5 @@
     "id": 1,
     "name": "Hatchling",
     "threshold": 10
-  },
-  {
-    "id": 2,
-    "name": "Kitten",
-    "threshold": 30
-  },
-  {
-    "id": 3,
-    "name": "Cat",
-    "threshold": 100
-  },
-  {
-    "id": 4,
-    "name": "Monkey",
-    "threshold": 300
-  },
-  {
-    "id": 5,
-    "name": "Dragon",
-    "threshold": 1000
   }
 ]
