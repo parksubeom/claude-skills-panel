@@ -2,6 +2,26 @@
 
 All notable changes to this extension are documented here.
 
+## [0.31.0] — 2026-05-01
+
+### Added — External-launch infrastructure
+
+This release is mostly marketing/launch assets. The code change is a single
+README hero strengthening; the rest is `docs/marketing/` content designed to
+be copy-pasted into external channels.
+
+- **Press kit** ([docs/marketing/PRESS_KIT.md](docs/marketing/PRESS_KIT.md)) — one-line / short / long descriptions, fact sheet, differentiators, FAQs, quotable lines (en/ko), image asset CDN links, GitHub repo metadata recipe (About / Topics / Social preview).
+- **One-pager** ([docs/marketing/ONE_PAGER.md](docs/marketing/ONE_PAGER.md)) — a 30-second markdown summary attachable to email, DM, Slack.
+- **Outreach templates** ([docs/marketing/OUTREACH.md](docs/marketing/OUTREACH.md)) — email/DM copy for Anthropic Devrel, AI/devtool influencers, sub moderators, AI tool directories, Korean dev communities.
+- **Blog post body** ([docs/marketing/BLOG_POST_BUILD_RETRO.md](docs/marketing/BLOG_POST_BUILD_RETRO.md)) — full ~5000-char retrospective in en + ko, ready to paste into dev.to / Hashnode / Medium / velog.
+- Marketing index rewritten with a 14-step launch timeline (T+0 → T+1m).
+
+### README
+- Hero now opens with the buddy lineup image as the visual anchor
+- Three-language tagline added ("English · 한국어 · 日本語")
+- Plugin Marketplace browser, Quick Bar, and trilingual support promoted to top-level bullets
+- "Built with Claude Code itself" tagline added — recursion as marketing angle
+
 ## [0.30.0] — 2026-05-01
 
 ### Added — Final buddy class artwork

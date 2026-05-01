@@ -5,17 +5,22 @@
 [![OpenVSX Downloads](https://img.shields.io/open-vsx/dt/parksubeom/claude-skills-panel?style=flat-square&label=Downloads&color=22c55e)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-> **Stop typing `/full-flow`, `/commit-prepare`, `/code-review` from memory.** This panel finds every Claude Code slash command on your machine and lets you fire it with one click — or one keystroke.
+> **Stop typing `/full-flow`, `/commit-prepare`, `/code-review` from memory.** This panel finds every Claude Code slash command on your machine and lets you fire it with one click — or one keystroke. **English · 한국어 · 日本語.**
+
+![Buddy lineup — 10 RPG classes that branch from your usage pattern](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
 
 The fastest way to use Claude Code:
 
 - 🔍 **Auto-discovers everything** — your `~/.claude/commands/`, project-level `.claude/commands/`, and every plugin you install via `/plugin install …` (superpowers, code-review, skill-creator, …)
 - ⚡ **One-click copy** (or auto-paste, or send-to-terminal) — pick the mode that fits your flow
-- 🔢 **Quick Bar with keys 1–6** — bind your top commands and never type them again
+- 🔢 **Quick Bar with keys 1–6** — bind your top commands and fire them from anywhere
 - 🔎 **Fuzzy search + keyboard nav** — `↓` to skim, `Enter` to fire, `/name` to send any command (even ones you haven't memorized)
+- 🛒 **Plugin Marketplace browser** — browse 243+ official plugins inside the panel and install with one click
 - 🎨 **Three pixel themes** — Dark, Retro CRT, Gameboy LCD
-- 🏆 **Optional gamification** — character that levels up, 16 achievements, weekly report (export as Markdown)
-- 🌐 **English · 한국어** — switch with one click
+- 🏆 **Optional gamification** — buddy that branches into 1 of 10 RPG classes by your usage, 16 achievements, weekly Markdown report
+- 🌐 **Trilingual** — toggle between English / 한국어 / 日本語
+
+> Built mostly *with* Claude Code itself. Recursion all the way down.
 
 ---
 

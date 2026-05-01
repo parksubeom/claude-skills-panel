@@ -4,27 +4,36 @@
 
 ## 자료
 
+- [PRESS_KIT.md](PRESS_KIT.md) — 미디어/인플루언서/Anthropic Devrel용 한 곳에서 가져갈 정보 (한 줄, 짧은·긴 설명, fact sheet, GitHub metadata 가이드)
+- [ONE_PAGER.md](ONE_PAGER.md) — 이메일·DM·Slack 첨부용 30초 소개 자료
+- [OUTREACH.md](OUTREACH.md) — 이메일/DM 템플릿 (Anthropic Devrel, 인플루언서, 모더레이터, 한국 커뮤니티)
 - [SCREENSHOT_PLAN.md](SCREENSHOT_PLAN.md) — 6장의 핵심 스크린샷 + 합성 가이드
 - [MAKING_DEMO_GIF.md](../MAKING_DEMO_GIF.md) — 10초 demo GIF 녹화 시나리오
 - [X_TWITTER.md](X_TWITTER.md) — 트윗 thread 카피 (영/한)
 - [REDDIT_HN.md](REDDIT_HN.md) — Show HN, r/ClaudeAI, r/vscode, r/cursor 게시 카피
 - [PRODUCT_HUNT.md](PRODUCT_HUNT.md) — taglines, description, Q&A 30개
 - [BLOG_OUTLINE.md](BLOG_OUTLINE.md) — 블로그 글 3종 outline
+- [BLOG_POST_BUILD_RETRO.md](BLOG_POST_BUILD_RETRO.md) — **1주 빌드 회고 본문** (영/한, 게시 즉시 가능)
 
 ## 권장 게시 순서
 
 | 단계 | 시점 | 작업 | 우선순위 |
 |---|---|---|---|
-| 1 | T+0 | demo.gif + HERO 스크린샷 만들기 | 🔴 필수 |
-| 2 | T+0 | Marketplace listing 갱신 (description은 이미 푸시됨, gallery 이미지 추가) | 🔴 필수 |
-| 3 | T+1d | X 단발 트윗 (V0) | 🟠 가벼운 시작 |
-| 4 | T+3d | r/ClaudeAI 게시 | 🟠 |
-| 5 | T+5d | Show HN — 화/수/목 자정 PT | 🔴 큰 임팩트 |
-| 6 | T+1w | X thread (V1, 7-tweet 풀버전) | 🟢 |
-| 7 | T+1w | r/vscode + r/cursor (24시간 간격) | 🟢 |
-| 8 | T+2w | Product Hunt | 🔴 큰 임팩트 |
-| 9 | T+3w | 블로그 (후보 1 — 1주 빌드기) | 🟢 |
-| 10 | T+1m | 데이터 회고 → 다음 페이즈 결정 | — |
+| 0 | T+0 | GitHub repo About / Topics / Social preview 설정 ([PRESS_KIT.md](PRESS_KIT.md) 하단 가이드) | 🔴 5분 작업, 검색 노출 직접 |
+| 1 | T+0 | demo.gif + HERO 스크린샷 만들기 ([MAKING_DEMO_GIF.md](../MAKING_DEMO_GIF.md)) | 🔴 필수 |
+| 2 | T+0 | Marketplace listing 갱신 (gallery 이미지 추가) | 🔴 필수 |
+| 3 | T+1d | X 단발 트윗 V0 ([X_TWITTER.md](X_TWITTER.md)) | 🟠 가벼운 시작 |
+| 4 | T+1d | Anthropic Devrel 이메일 / DM ([OUTREACH.md](OUTREACH.md) section A) | 🟠 답장 안 와도 OK |
+| 5 | T+3d | r/ClaudeAI 게시 ([REDDIT_HN.md](REDDIT_HN.md)) | 🟠 |
+| 6 | T+3d | 한국 커뮤니티 — GeekNews, OKKY 등 ([OUTREACH.md](OUTREACH.md) section E) | 🟠 |
+| 7 | T+5d | Show HN — 화/수/목 자정 PT | 🔴 큰 임팩트 |
+| 8 | T+1w | X thread V1 (7-tweet 풀버전) | 🟢 |
+| 9 | T+1w | r/vscode + r/cursor (24시간 간격) | 🟢 |
+| 10 | T+1w | 블로그 [BLOG_POST_BUILD_RETRO.md](BLOG_POST_BUILD_RETRO.md) — dev.to/Hashnode 동시 게시 (canonical 한쪽) | 🔴 SEO 자산 |
+| 11 | T+1w | 인플루언서 1명에게 DM ([OUTREACH.md](OUTREACH.md) section B) | 🟢 |
+| 12 | T+2w | Product Hunt | 🔴 큰 임팩트 |
+| 13 | T+3w | AI 도구 디렉토리 등록 ([OUTREACH.md](OUTREACH.md) section D) — 5–10곳 | 🟢 |
+| 14 | T+1m | 데이터 회고 → 다음 페이즈 결정 | — |
 
 ## 메시지 톤 일관성
 
