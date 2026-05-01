@@ -2,6 +2,47 @@
 
 All notable changes to this extension are documented here.
 
+## [0.29.0] — 2026-05-01
+
+### Buddy system: class-branch evolution
+
+Big buddy mechanic change. The single 6-stage Egg → Dragon line is gone, replaced by a 5-stage system that **branches into one of 10 classes** based on the user's slash-command usage pattern.
+
+#### Stages
+- **LV.1 Egg** (action 0–9) — common
+- **LV.2 Hatchling** (action 10–49) — common
+- **LV.3 [Class]** (action 50–149) — class is decided here, by max-count category in `skillStats`
+- **LV.4 [Class] Adept** (150–499) — same sprite, code-side aura overlay (planned)
+- **LV.5 [Class] Master** (500+) — strongest aura
+
+#### 10 classes
+Codey 🗡️ Swordsman · Docly 📜 Cleric · Debuggo 🔍 Detective · Testra 🛡️ Paladin · Sheety 📊 Merchant · Slidey 🎤 Bard · PDFox 🦊 Rogue · Webbie 🕸️ Wizard · Datia 🧙‍♀️ Astrologer · Gitto ⚔️ Ninja
+
+Each tied to a regex over the slash-command name. `/code-review` → Testra, `/full-flow` → Codey (default), `/git-commit` → Gitto, etc.
+
+#### Data model additions
+- `character.skillStats` — per-class action counters
+- `character.class` — locked once at LV.3, can be reset via Reincarnate
+- `character.classLockedAt` — ISO timestamp
+- Migration: existing users past 50 actions auto-decide on next render
+
+#### UI
+- Character sheet now shows the locked class (emoji + role + LV) or, pre-branch, a "X more uses until class is decided" hint.
+- New `skillStats` bar chart per class, sorted by count, current class highlighted.
+- New `🔄 Reincarnate` button — clears the class, keeps the counts.
+- Class-branch toast (`⚔️ {name} has chosen the path of the {role} — {stage}!`) fires on the action that triggers the branch.
+
+#### Sprite resolution
+- LV.1/2 use `assets/pixel-icons/buddy/stage{0,1}.png` (existing Egg/Hatchling sprites — kept).
+- LV.3+ uses `assets/pixel-icons/buddy/class/<id>.png`. Falls back to legacy stage PNG if missing.
+- New `scripts/build-buddy-classes.js` ships **placeholder pixel sprites** for all 10 classes (chibi silhouettes in each class's signature color). The script auto-detects when a real artist PNG (>2KB) is dropped at the same path and skips overwriting.
+- Final class designs are being produced externally; this PR ships the working system so swapping in the real PNGs is a one-commit follow-up.
+
+#### i18n
+- 10 × 2 keys for class names and roles (en/ko/ja).
+- New buddy modal copy + `toast.classBranch`.
+- `check-i18n.js` updated to ignore dynamic key prefixes (`t('class.' + id + '.name')`).
+
 ## [0.28.0] — 2026-05-01
 
 ### Added — 32 new Spark preset icons

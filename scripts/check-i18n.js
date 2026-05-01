@@ -39,9 +39,13 @@ const referenced = new Set();
 const re = /\bt\(\s*['"]([a-zA-Z][\w.]+)['"]/g;
 let m;
 while ((m = re.exec(ext))) referenced.add(m[1]);
-// Filter out false positives (DOM tagnames etc.)
+// Filter out false positives (DOM tagnames etc.) and dynamic key prefixes
+// like t('class.' + id + '.name') — those have a trailing dot from string
+// concatenation and aren't real keys.
 const DOM_TAGS = new Set(['span', 'div', 'a', 'img', 'p', 'h3', 'h4', 'br']);
-const realRefs = [...referenced].filter((k) => !DOM_TAGS.has(k) && k.includes('.'));
+const realRefs = [...referenced].filter(
+  (k) => !DOM_TAGS.has(k) && k.includes('.') && !k.endsWith('.')
+);
 
 // Check that every referenced key exists in every supported locale
 for (const loc of i18n.SUPPORTED) {

@@ -138,8 +138,15 @@ function recordUsage(name, source) {
   if (!c.name) c.name = os.userInfo().username || 'Claude';
   if (typeof c.actions !== 'number') c.actions = 0;
   if (!c.stats) c.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+  if (!c.skillStats) c.skillStats = {};
+  if (!('class' in c)) c.class = null;
+  if (!('classLockedAt' in c)) c.classLockedAt = null;
   const prevStage = buddyStageFor(c.actions);
+  const prevClass = c.class;
   c.actions += 1;
+  // Count this action toward its category, for class-decision math.
+  const cat = classifySkill(name);
+  c.skillStats[cat] = (c.skillStats[cat] || 0) + 1;
   if (INT_KEYWORDS.test(name)) c.stats.int += 1;
   c.stats.dex += source === 'quickbar' ? 2 : 1;
   // VIT: only on streak days where this is the first action (we just bumped streak above)
@@ -151,6 +158,15 @@ function recordUsage(name, source) {
     }
   }
   const nextStage = buddyStageFor(c.actions);
+
+  // Class branch: when reaching LV.3 for the first time, lock in the class
+  // based on which category the user has touched most.
+  let branchedTo = null;
+  if (nextStage >= BRANCH_AT_LEVEL && !c.class) {
+    c.class = decideClass(c.skillStats);
+    c.classLockedAt = now;
+    branchedTo = c.class;
+  }
 
   // Achievements (lazy require to avoid cycle)
   const achievements = require('./achievements');
@@ -168,15 +184,23 @@ function recordUsage(name, source) {
     buddy: {
       prevStage,
       nextStage,
-      stageName: BUDDY_NAMES[nextStage],
+      stageName: stageNameFor(nextStage, c.class),
+      class: c.class,
+      branchedTo,
+      prevClass,
       character: getCharacter(),
     },
   };
 }
 
-// Buddy character thresholds (must match build-buddy-icons.js STAGES)
-const BUDDY_THRESHOLDS = [0, 10, 30, 100, 300, 1000];
-const BUDDY_NAMES = ['Egg', 'Slime', 'Bunny', 'Cat', 'Fox', 'Dragon'];
+// 5-stage class-branch system (v0.29+).
+// LV.1 Egg → LV.2 Hatchling (common) → LV.3-5 [class-specific].
+// Class is decided once, at action 50, by max-count category in skillStats.
+const BUDDY_THRESHOLDS = [0, 10, 50, 150, 500];
+const STAGE_NAMES_GENERIC = ['Egg', 'Hatchling', 'Novice', 'Adept', 'Master'];
+// Legacy export kept for any downstream code; remapped onto the new 5-stage system.
+const BUDDY_NAMES = STAGE_NAMES_GENERIC;
+const BRANCH_AT_LEVEL = 2; // LV.3 (zero-indexed = 2)
 
 function buddyStageFor(actions) {
   for (let i = BUDDY_THRESHOLDS.length - 1; i >= 0; i--) {
@@ -185,8 +209,70 @@ function buddyStageFor(actions) {
   return 0;
 }
 
+// 10 buddy classes, each tied to a category of slash-command keywords.
+// Order matters for tie-breaking (alphabetical = deterministic).
+const BUDDY_CLASSES = [
+  { id: 'codey',   role: 'Swordsman',  emoji: '🗡️' },
+  { id: 'datia',   role: 'Astrologer', emoji: '🧙‍♀️' },
+  { id: 'debuggo', role: 'Detective',  emoji: '🔍' },
+  { id: 'docly',   role: 'Cleric',     emoji: '📜' },
+  { id: 'gitto',   role: 'Ninja',      emoji: '⚔️' },
+  { id: 'pdfox',   role: 'Rogue',      emoji: '🦊' },
+  { id: 'sheety',  role: 'Merchant',   emoji: '📊' },
+  { id: 'slidey',  role: 'Bard',       emoji: '🎤' },
+  { id: 'testra',  role: 'Paladin',    emoji: '🛡️' },
+  { id: 'webbie',  role: 'Wizard',     emoji: '🕸️' },
+];
+const BUDDY_CLASS_IDS = BUDDY_CLASSES.map((c) => c.id);
+
+// Slash-command name → class id, by keyword substring (case-insensitive).
+// First match wins, so ordering matters for overlap (e.g. "code-review" → testra
+// since "review" is checked before "code"). Tune as the catalog grows.
+const CATEGORY_RULES = [
+  { class: 'gitto',   re: /\b(git|commit|branch|push|pull[- ]?request|pr\b|merge|rebase)/i },
+  { class: 'testra',  re: /(test|spec|verify|check|review|audit)/i },
+  { class: 'debuggo', re: /(debug|bug|fix|trace|stacktrace|logs?)/i },
+  { class: 'docly',   re: /(doc|docs|write|markdown|readme|note)/i },
+  { class: 'sheety',  re: /(xlsx|csv|spreadsheet|sheet|excel|table|tsv)/i },
+  { class: 'slidey',  re: /(slide|pptx|present|pitch|keynote)/i },
+  { class: 'pdfox',   re: /(pdf)/i },
+  { class: 'webbie',  re: /(web|frontend|front-end|ui\b|css|react|tailwind|figma|design)/i },
+  { class: 'datia',   re: /(analy[sz]e|chart|viz|visuali[sz]e|metric|dashboard|stats?)/i },
+  { class: 'codey',   re: /(code|refactor|simpl|implement|build|compile)/i },
+];
+
+function classifySkill(name) {
+  const s = String(name || '');
+  for (const rule of CATEGORY_RULES) {
+    if (rule.re.test(s)) return rule.class;
+  }
+  return 'codey'; // default fallback
+}
+
+function decideClass(skillStats) {
+  let max = -1;
+  let winner = 'codey';
+  for (const cls of BUDDY_CLASS_IDS) {
+    const count = (skillStats && skillStats[cls]) || 0;
+    if (count > max) {
+      max = count;
+      winner = cls;
+    }
+  }
+  return winner;
+}
+
 // INT growth from thinking/planning skills, DEX from quick triggers, etc.
 const INT_KEYWORDS = /(brainstorm|writing-plans|writing-skills|planning|review|debug|verif|simplif|systematic)/i;
+
+function stageNameFor(stage, classId) {
+  if (stage < BRANCH_AT_LEVEL) return STAGE_NAMES_GENERIC[stage];
+  if (!classId) return STAGE_NAMES_GENERIC[stage]; // pre-branch fallback
+  const suffix = stage === BRANCH_AT_LEVEL ? '' : ' ' + STAGE_NAMES_GENERIC[stage];
+  // Class display name comes from i18n on the webview side; here we just hand
+  // back the raw class id so the renderer can localize.
+  return classId + (suffix ? ' (' + suffix.trim() + ')' : '');
+}
 
 function getCharacter() {
   const cfg = read();
@@ -194,11 +280,31 @@ function getCharacter() {
   if (!c.name) c.name = os.userInfo().username || 'Claude';
   if (typeof c.actions !== 'number') c.actions = 0;
   if (!c.stats) c.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+  if (!c.skillStats) c.skillStats = {};
+  if (!('class' in c)) c.class = null;
+  if (!('classLockedAt' in c)) c.classLockedAt = null;
+  // Auto-decide class for users already past the branch threshold but missing
+  // a class (migration from pre-0.29 data).
   c.stage = buddyStageFor(c.actions);
-  c.stageName = BUDDY_NAMES[c.stage];
+  if (c.stage >= BRANCH_AT_LEVEL && !c.class) {
+    c.class = decideClass(c.skillStats);
+    c.classLockedAt = new Date().toISOString();
+  }
+  c.stageName = STAGE_NAMES_GENERIC[c.stage];
   c.nextThreshold = BUDDY_THRESHOLDS[c.stage + 1] || null;
   c.currentThreshold = BUDDY_THRESHOLDS[c.stage];
   return c;
+}
+
+// Reset class so the next action picks again from current skillStats.
+// skillStats are intentionally preserved (no penalty).
+function reincarnate() {
+  const cfg = read();
+  if (!cfg.character) cfg.character = {};
+  cfg.character.class = null;
+  cfg.character.classLockedAt = null;
+  write(cfg);
+  return cfg;
 }
 
 function setCharacterName(name) {
@@ -216,9 +322,14 @@ function recordBuddyAction(skillName, source) {
   if (!c.name) c.name = os.userInfo().username || 'Claude';
   if (typeof c.actions !== 'number') c.actions = 0;
   if (!c.stats) c.stats = { int: 0, dex: 0, vit: 0, lck: 0 };
+  if (!c.skillStats) c.skillStats = {};
+  if (!('class' in c)) c.class = null;
+  if (!('classLockedAt' in c)) c.classLockedAt = null;
 
   const prevStage = buddyStageFor(c.actions);
   c.actions += 1;
+  const cat = classifySkill(skillName);
+  c.skillStats[cat] = (c.skillStats[cat] || 0) + 1;
   // INT: thinking-type skills
   if (INT_KEYWORDS.test(skillName)) c.stats.int += 1;
   // DEX: quick-bar / fast triggers
@@ -227,6 +338,10 @@ function recordBuddyAction(skillName, source) {
   // VIT: bumped daily by streak (handled separately)
   // LCK: bumped on achievements (handled separately)
   const nextStage = buddyStageFor(c.actions);
+  if (nextStage >= BRANCH_AT_LEVEL && !c.class) {
+    c.class = decideClass(c.skillStats);
+    c.classLockedAt = new Date().toISOString();
+  }
   write(cfg);
   return { prevStage, nextStage, character: getCharacter() };
 }
@@ -461,6 +576,14 @@ module.exports = {
   buddyStageFor,
   BUDDY_THRESHOLDS,
   BUDDY_NAMES,
+  BUDDY_CLASSES,
+  BUDDY_CLASS_IDS,
+  STAGE_NAMES_GENERIC,
+  BRANCH_AT_LEVEL,
+  classifySkill,
+  decideClass,
+  stageNameFor,
+  reincarnate,
   getLocale,
   setLocale,
   getTheme,

@@ -428,11 +428,25 @@ function renderHtml(webview, skills) {
   // Buddy character
   const character = userConfig.getCharacter();
   const BUDDY_NAMES = userConfig.BUDDY_NAMES;
+  // Stage 0/1: common Egg/Hatchling. Stage 2+: class-specific sprite (after branch).
+  // Falls back gracefully if a class PNG hasn't been delivered by the designer yet.
   const buddyImg = (() => {
     if (!PIXEL_DIR) return null;
-    const abs = path.join(PIXEL_DIR, 'buddy', `stage${character.stage}.png`);
-    if (!fs.existsSync(abs)) return null;
-    return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
+    let candidates;
+    if (character.stage <= 1 || !character.class) {
+      candidates = [`buddy/stage${character.stage}.png`, 'buddy/stage0.png'];
+    } else {
+      candidates = [
+        `buddy/class/${character.class}.png`,
+        `buddy/stage${character.stage}.png`,
+        'buddy/stage5.png',
+      ];
+    }
+    for (const rel of candidates) {
+      const abs = path.join(PIXEL_DIR, rel);
+      if (fs.existsSync(abs)) return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
+    }
+    return null;
   })();
   const buddyProgress = character.nextThreshold
     ? Math.round(((character.actions - character.currentThreshold) / (character.nextThreshold - character.currentThreshold)) * 100)
@@ -1710,6 +1724,39 @@ function renderHtml(webview, skills) {
   /* Hidden markdown textarea (used as a transport for copy/save) */
   .report-md-hidden { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+  /* Buddy class skill-stats section */
+  .skill-stats-section { margin-top: 14px; }
+  .skill-stats-title { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
+  .skill-stats-bars { display: flex; flex-direction: column; gap: 4px; }
+  .skill-stat-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 32px;
+    gap: 8px; align-items: center;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    font-size: 10px;
+  }
+  .skill-stat-row.current {
+    border-color: var(--accent);
+    background: rgba(125, 211, 252, 0.06);
+  }
+  .ssr-name { color: var(--fg); }
+  .skill-stat-row.current .ssr-name { color: var(--accent); font-weight: 700; }
+  .ssr-bar {
+    height: 8px;
+    background: var(--bg);
+    border: 1px solid var(--frame-strong);
+    overflow: hidden;
+    position: relative;
+  }
+  .ssr-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--accent), var(--accent-2));
+    transition: width 0.4s ease;
+  }
+  .skill-stat-row.current .ssr-fill { background: var(--accent-2); }
+  .ssr-count { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
   /* Telemetry first-run banner */
   .tlm-banner {
     display: flex; gap: 8px; align-items: center;
@@ -2314,12 +2361,16 @@ function renderHtml(webview, skills) {
             <input type="text" id="buddy-name-input" value="${escapeHtml(character.name)}" maxlength="20" />
             <button class="btn" id="buddy-save-name">${t('modal.buddy.save')}</button>
           </div>
-          <div class="buddy-stage">${escapeHtml(character.stageName)} <span class="hint">(LV.${character.stage + 1}/7)</span></div>
+          <div class="buddy-stage">
+            ${character.class
+              ? `${userConfig.BUDDY_CLASSES.find((c) => c.id === character.class)?.emoji || ''} <strong>${t('class.' + character.class + '.name')}</strong> <span class="hint">${t('class.' + character.class + '.role')} · LV.${character.stage + 1}/5</span>`
+              : `${escapeHtml(character.stageName)} <span class="hint">LV.${character.stage + 1}/5${character.stage < userConfig.BRANCH_AT_LEVEL ? ' · ' + t('modal.buddy.preBranch', { remaining: Math.max(0, userConfig.BUDDY_THRESHOLDS[userConfig.BRANCH_AT_LEVEL] - character.actions) }) : ''}</span>`}
+          </div>
           <div class="buddy-progress">
             <div class="buddy-progress-bar" style="width: ${buddyProgress}%"></div>
             <div class="buddy-progress-label">
               ${character.nextThreshold
-                ? `${character.actions} / ${character.nextThreshold} → ${escapeHtml(BUDDY_NAMES[character.stage + 1])}`
+                ? `${character.actions} / ${character.nextThreshold}`
                 : `MAX (${character.actions})`}
             </div>
           </div>
@@ -2338,7 +2389,37 @@ function renderHtml(webview, skills) {
           </div>
         `).join('')}
       </div>
+
+      <div class="skill-stats-section">
+        <div class="skill-stats-title">
+          ${character.class ? t('modal.buddy.skillStatsAfter') : t('modal.buddy.skillStatsBefore')}
+        </div>
+        <div class="skill-stats-bars">
+          ${(() => {
+            const stats = character.skillStats || {};
+            const entries = userConfig.BUDDY_CLASSES.map((c) => ({
+              id: c.id, role: c.role, emoji: c.emoji,
+              count: stats[c.id] || 0,
+            }));
+            const max = Math.max(1, ...entries.map((e) => e.count));
+            return entries
+              .sort((a, b) => b.count - a.count)
+              .map((e) => {
+                const pct = Math.round((e.count / max) * 100);
+                const isCurrent = character.class === e.id;
+                return `
+                  <div class="skill-stat-row ${isCurrent ? 'current' : ''}">
+                    <div class="ssr-name">${e.emoji} ${t('class.' + e.id + '.name')}</div>
+                    <div class="ssr-bar"><div class="ssr-fill" style="width: ${pct}%"></div></div>
+                    <div class="ssr-count">${e.count}</div>
+                  </div>`;
+              }).join('');
+          })()}
+        </div>
+      </div>
+
       <div class="modal-actions">
+        ${character.class ? `<button class="btn btn-danger" id="buddy-reincarnate">${t('modal.buddy.reincarnate')}</button>` : ''}
         <button class="btn" id="buddy-close">${t('modal.buddy.close')}</button>
       </div>
     </div>
@@ -2667,6 +2748,12 @@ document.getElementById('buddy-save-name').addEventListener('click', () => {
   showToast(t('toast.buddyName', { name }));
   sfxClick();
 });
+const reincarnateBtn = document.getElementById('buddy-reincarnate');
+if (reincarnateBtn) reincarnateBtn.addEventListener('click', () => {
+  if (!confirm(t('modal.buddy.reincarnateConfirm'))) return;
+  vscode.postMessage({ type: 'reincarnate' });
+  sfxClick();
+});
 const modalBg = document.getElementById('modal-bg');
 const mAlias = document.getElementById('m-alias');
 const mNote = document.getElementById('m-note');
@@ -2902,13 +2989,32 @@ window.addEventListener('message', (e) => {
 
     // Buddy stage-up celebration
     if (m.buddy && m.buddy.nextStage > m.buddy.prevStage) {
-      const stageName = m.buddy.stageName;
+      const className = m.buddy.class ? t('class.' + m.buddy.class + '.name') : m.buddy.stageName;
+      const role = m.buddy.class ? t('class.' + m.buddy.class + '.role') : '';
       setTimeout(() => {
-        showToast(t('toast.evolution', { name: m.buddy.character.name || 'Claude', stage: stageName }));
+        // If this stage-up is the moment we *branched* to a class, show a
+        // stronger "you are now Class X" toast; otherwise the regular evolve.
+        const msgKey = m.buddy.branchedTo ? 'toast.classBranch' : 'toast.evolution';
+        showToast(t(msgKey, {
+          name: m.buddy.character.name || 'Claude',
+          stage: className,
+          role,
+        }));
         beep({ freq: 523, duration: 0.12, vol: 0.08 });
         setTimeout(() => beep({ freq: 659, duration: 0.12, vol: 0.08 }), 130);
         setTimeout(() => beep({ freq: 784, duration: 0.12, vol: 0.08 }), 260);
         setTimeout(() => beep({ freq: 1047, duration: 0.2, vol: 0.08 }), 390);
+      }, 400);
+    } else if (m.buddy && m.buddy.branchedTo) {
+      // Branch can fire on the same action as a stage-up (covered above) or on
+      // its own when migrating an existing user past the threshold — handle
+      // the migration case explicitly.
+      setTimeout(() => {
+        showToast(t('toast.classBranch', {
+          name: m.buddy.character.name || 'Claude',
+          stage: t('class.' + m.buddy.branchedTo + '.name'),
+          role: t('class.' + m.buddy.branchedTo + '.role'),
+        }));
       }, 400);
     }
     // Update toolbar avatar tooltip on each tick (image refreshes on next render)
@@ -3510,6 +3616,9 @@ class SkillsViewProvider {
             v.webview.postMessage({ type: 'toast', key: 'toast.weeklySaved' });
           }
         }
+      } else if (msg.type === 'reincarnate') {
+        userConfig.reincarnate();
+        this.refresh();
       } else if (msg.type === 'setBuddyName') {
         userConfig.setCharacterName(msg.name || '');
         clearTimeout(this._buddyRefreshTimer);
