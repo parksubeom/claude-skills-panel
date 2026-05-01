@@ -2,6 +2,26 @@
 
 All notable changes to this extension are documented here.
 
+## [0.28.0] — 2026-05-01
+
+### Added — 32 new Spark preset icons
+- 30 → 62 icons. New entries cover generic developer/UI categories the
+  previous set was missing: `search`, `settings`, `terminal`, `file`,
+  `folder`, `save`, `star`, `heart`, `lightbulb`, `rocket`, `fire`,
+  `lock`, `key`, `clock`, `mail`, `chat`, `branch`, `merge`, `tag`,
+  `flag`, `play`, `stop`, `refresh`, `sync`, `upload`, `download`,
+  `share`, `bookmark`, `magic`, `plus`, `check`, `cross`.
+- Each is a 12×12 pixel grid built into a 96×96 PNG with the same
+  Spark frame as the original 30. Available via the Spark preset
+  picker in the skill edit modal — search filter already handles them.
+
+### Added — Buddy design workflow
+- `docs/BUDDY_DESIGN.md` — concept options (Animal / Slime / Robot /
+  Wizard / Pixel pet), recommended palettes per stage, Piskel
+  workflow, blank stage template, threshold tuning notes.
+- Lays the groundwork for the planned full-buddy redesign — the actual
+  pixel art will land in a follow-up once the new design is finalized.
+
 ## [0.27.0] — 2026-05-01
 
 ### Added — Japanese (ja) locale
