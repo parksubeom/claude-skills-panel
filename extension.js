@@ -2498,7 +2498,7 @@ const scanlinesBtn = document.getElementById('scanlines-toggle');
 const localeBtn = document.getElementById('locale-toggle');
 if (localeBtn) {
   localeBtn.addEventListener('click', () => {
-    const cycle = ['en', 'ko', 'ja'];
+    const cycle = ['en', 'ko', 'ja', 'zh'];
     const idx = cycle.indexOf(LOCALE);
     const next = cycle[(idx + 1) % cycle.length];
     vscode.postMessage({ type: 'setLocale', locale: next });

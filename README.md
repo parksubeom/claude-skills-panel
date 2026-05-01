@@ -3,9 +3,12 @@
 [![OpenVSX Version](https://img.shields.io/open-vsx/v/parksubeom/claude-skills-panel?style=flat-square&label=OpenVSX&color=7dd3fc&logo=vscodium)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/parksubeom.claude-skills-panel?style=flat-square&label=VS%20Marketplace&color=2563eb&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel)
 [![OpenVSX Downloads](https://img.shields.io/open-vsx/dt/parksubeom/claude-skills-panel?style=flat-square&label=Downloads&color=22c55e)](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
+[![GitHub stars](https://img.shields.io/github/stars/parksubeom/claude-skills-panel?style=flat-square&color=fbbf24&logo=github)](https://github.com/parksubeom/claude-skills-panel)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-> **Stop typing `/full-flow`, `/commit-prepare`, `/code-review` from memory.** This panel finds every Claude Code slash command on your machine and lets you fire it with one click — or one keystroke. **English · 한국어 · 日本語.**
+> **Stop typing `/full-flow`, `/commit-prepare`, `/code-review` from memory.** This panel finds every Claude Code slash command on your machine and lets you fire it with one click — or one keystroke.
+>
+> **English** · **한국어** — 외워서 타이핑하지 말고 한 번에 클릭. · **日本語** — もう打たないで、ワンクリックで起動。 · **中文** — 别再死记斜杠命令,一键触发。
 
 ![Buddy lineup — 10 RPG classes that branch from your usage pattern](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
 

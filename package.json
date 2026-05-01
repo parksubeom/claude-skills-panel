@@ -1,8 +1,8 @@
 {
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
-  "description": "The fastest way to use Claude Code slash commands. Auto-discovers every /command, /skill, and installed plugin (superpowers, code-review, …). One click to copy or run. Aliases, custom groups, Quick Bar (keys 1–6), achievements, themes, fuzzy search. English · 한국어.",
-  "version": "0.31.0",
+  "description": "The fastest way to use Claude Code slash commands. Auto-discovers every /command, /skill, and installed plugin (superpowers, code-review, …). One click to copy or run. Aliases, custom groups, Quick Bar (keys 1–6), achievements, themes, fuzzy search. English · 한국어 · 日本語 · 中文.",
+  "version": "0.32.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",
@@ -47,12 +47,33 @@
     "developer-experience",
     "developer-tools",
     "agent",
-    "agents"
+    "agents",
+    "i18n",
+    "中文",
+    "한국어",
+    "日本語"
   ],
   "galleryBanner": {
     "color": "#0f172a",
     "theme": "dark"
   },
+  "badges": [
+    {
+      "url": "https://img.shields.io/open-vsx/dt/parksubeom/claude-skills-panel?style=flat-square&label=Downloads&color=22c55e",
+      "href": "https://open-vsx.org/extension/parksubeom/claude-skills-panel",
+      "description": "OpenVSX downloads"
+    },
+    {
+      "url": "https://img.shields.io/github/stars/parksubeom/claude-skills-panel?style=flat-square&color=fbbf24&logo=github",
+      "href": "https://github.com/parksubeom/claude-skills-panel",
+      "description": "GitHub stars"
+    },
+    {
+      "url": "https://img.shields.io/badge/license-MIT-22c55e?style=flat-square",
+      "href": "https://github.com/parksubeom/claude-skills-panel/blob/main/LICENSE",
+      "description": "MIT License"
+    }
+  ],
   "qna": "https://github.com/parksubeom/claude-skills-panel/issues",
   "pricing": "Free",
   "sponsor": {

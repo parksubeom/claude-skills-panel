@@ -2,6 +2,20 @@
 
 All notable changes to this extension are documented here.
 
+## [0.32.0] — 2026-05-01
+
+### Added — Chinese (zh) locale + extra discovery surface
+
+- **Full Simplified Chinese translation** of all 209 keys, at parity with en/ko/ja. The 🌐 footer toggle now cycles `en → ko → ja → zh → en`. `vscode.env.language === 'zh-cn'` (or any zh-* variant) auto-detects.
+- The 10 buddy classes get Chinese names: 科迪 (Codey), 文档师 (Docly), 调试侠 (Debuggo), 测试拉 (Testra), 表格师 (Sheety), 幻灯侠 (Slidey), PDF 狐 (PDFox), 网页师 (Webbie), 达提娅 (Datia), 吉托 (Gitto).
+
+### Marketplace exposure
+- `package.json` `description` now ends with `English · 한국어 · 日本語 · 中文` so the localization story is visible on listing.
+- New `keywords`: `i18n`, `中文`, `한국어`, `日本語` — non-English search terms hit non-English browsers.
+- New `badges` field — VS Marketplace renders these on the listing's metadata sidebar (OpenVSX downloads, GitHub stars, MIT license).
+- README adds a multilingual one-liner under the badges so non-English visitors instantly see "this is for me."
+- Trust badge added: GitHub stars (live count).
+
 ## [0.31.0] — 2026-05-01
 
 ### Added — External-launch infrastructure
