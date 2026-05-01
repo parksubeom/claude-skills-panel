@@ -6,24 +6,32 @@
 [![GitHub stars](https://img.shields.io/github/stars/parksubeom/claude-skills-panel?style=flat-square&color=fbbf24&logo=github)](https://github.com/parksubeom/claude-skills-panel)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-> **Stop typing `/full-flow`, `/commit-prepare`, `/code-review` from memory.** This panel finds every Claude Code slash command on your machine and lets you fire it with one click — or one keystroke.
->
-> **English** · **한국어** — 외워서 타이핑하지 말고 한 번에 클릭. · **日本語** — もう打たないで、ワンクリックで起動。 · **中文** — 别再死记斜杠命令,一键触发。
+## Stop typing `/full-flow` from memory.
 
-![Buddy lineup — 10 RPG classes that branch from your usage pattern](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
+If you use **[Claude Code](https://docs.claude.com/en/docs/claude-code)** (Anthropic's AI coding assistant) and you've installed even one plugin, you've probably got 30+ slash commands you can't remember.
 
-The fastest way to use Claude Code:
+**This is the panel for them.** One click to fire any command. Or `1`–`6`. Or fuzzy search. Or just browse.
 
-- 🔍 **Auto-discovers everything** — your `~/.claude/commands/`, project-level `.claude/commands/`, and every plugin you install via `/plugin install …` (superpowers, code-review, skill-creator, …)
-- ⚡ **One-click copy** (or auto-paste, or send-to-terminal) — pick the mode that fits your flow
-- 🔢 **Quick Bar with keys 1–6** — bind your top commands and fire them from anywhere
-- 🔎 **Fuzzy search + keyboard nav** — `↓` to skim, `Enter` to fire, `/name` to send any command (even ones you haven't memorized)
-- 🛒 **Plugin Marketplace browser** — browse 243+ official plugins inside the panel and install with one click
+![Buddy lineup — your usage pattern decides which of 10 RPG classes your buddy becomes](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
+
+**Three things you get the moment you install:**
+
+1. **A grid of every slash command on your machine.** Your `~/.claude/skills/`, your `~/.claude/commands/`, your project-level `.claude/`, and every plugin you've installed via `/plugin install` — all auto-discovered, no setup.
+2. **One-click execution.** Click a card → command goes to clipboard. Or auto-paste + Enter. Or send straight to your active terminal. Pick the mode that fits.
+3. **A built-in plugin marketplace browser.** 243+ official plugins, searchable, **one-click install**. The GUI Claude Code never had.
+
+**And then the side-project gravity hits:**
+
+- ⚔️ **A buddy that branches into 1 of 10 RPG classes** based on your slash command usage. Use a lot of `/git-*`? You become **Gitto the Ninja**. Heavy on `/code-review`? **Testra the Paladin**. Reincarnate any time.
 - 🎨 **Three pixel themes** — Dark, Retro CRT, Gameboy LCD
-- 🏆 **Optional gamification** — buddy that branches into 1 of 10 RPG classes by your usage, 16 achievements, weekly Markdown report
-- 🌐 **Trilingual** — toggle between English / 한국어 / 日本語
+- 🏆 **Skills level up** (LV.0 → LV.5), **16 achievements**, **weekly Markdown report**
+- 🌐 **Four languages** — English / 한국어 / 日本語 / 中文
 
-> Built mostly *with* Claude Code itself. Recursion all the way down.
+**All gamification is one toggle off.** The clean professional panel is one click away.
+
+> 외워서 타이핑하지 말고 한 번에 클릭 · もう打たないで、ワンクリックで起動 · 别再死记斜杠命令,一键触发
+
+> Built mostly *with* Claude Code itself. Free, MIT, ~120 KB, no telemetry by default.
 
 ---
 

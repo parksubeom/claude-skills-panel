@@ -2,6 +2,26 @@
 
 All notable changes to this extension are documented here.
 
+## [0.34.0] — 2026-05-01
+
+### Listing rewrite — first-time visitor focus
+
+Both the Marketplace `description` and the README hero are rewritten around the question "what does a first-time visitor see in 5 seconds?"
+
+**`package.json` description**:
+- Was: feature-list ("Auto-discovers every /command, /skill, …")
+- Now: pain-then-solution hook ("Stop typing /commit-prepare from memory. Finds every Claude Code slash command on your machine — your skills, project commands, all installed plugins — and fires it with one click or keys 1–6. Built-in plugin marketplace browser. Free, MIT.")
+
+**README hero**:
+- Headline `## Stop typing /full-flow from memory.` opens the README
+- One-line context for visitors who don't know Claude Code yet (links to the official docs)
+- Reframed as "Three things you get the moment you install" (concrete value) followed by "And then the side-project gravity hits" (the gamification)
+- Cropped buddy-lineup.png positioned higher, with sharper alt text ("your usage pattern decides which of 10 RPG classes your buddy becomes")
+- "All gamification is one toggle off" reassurance directly under the gamification list — addresses the most common objection (e.g. "I just want a clean launcher")
+- Tagline carried in three languages on the same line so non-English visitors see immediate value
+
+No code changes. The image asset already swapped to the cropped version in v0.33-era; this release makes the listing copy match.
+
 ## [0.33.0] — 2026-05-01
 
 ### Removed — unused legacy buddy sprites
