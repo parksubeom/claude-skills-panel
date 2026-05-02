@@ -9,8 +9,10 @@
 - [OUTREACH.md](OUTREACH.md) — 이메일/DM 템플릿 (Anthropic Devrel, 인플루언서, 모더레이터, 한국 커뮤니티)
 - [SCREENSHOT_PLAN.md](SCREENSHOT_PLAN.md) — 6장의 핵심 스크린샷 + 합성 가이드
 - [MAKING_DEMO_GIF.md](../MAKING_DEMO_GIF.md) — 10초 demo GIF 녹화 시나리오
-- [X_TWITTER.md](X_TWITTER.md) — 트윗 thread 카피 (영/한)
+- [X_TWITTER.md](X_TWITTER.md) — 트윗 단발 + thread 카피 (영/한), 알고리즘 팁, 응답 템플릿
+- [THREADS.md](THREADS.md) — Threads (Meta) 단발 + 짧은 thread, X와 차이점 정리
 - [REDDIT_HN.md](REDDIT_HN.md) — Show HN, r/ClaudeAI, r/vscode, r/cursor 게시 카피
+- [REDDIT_INDIRECT.md](REDDIT_INDIRECT.md) — 토론 톤 Reddit 게시 (Rule 7 정렬, account-too-new 트러블슈팅)
 - [PRODUCT_HUNT.md](PRODUCT_HUNT.md) — taglines, description, Q&A 30개
 - [BLOG_OUTLINE.md](BLOG_OUTLINE.md) — 블로그 글 3종 outline
 - [BLOG_POST_BUILD_RETRO.md](BLOG_POST_BUILD_RETRO.md) — **1주 빌드 회고 본문** (영/한, 게시 즉시 가능)

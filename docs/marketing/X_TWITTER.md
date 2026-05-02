@@ -1,84 +1,98 @@
-# X (Twitter) 게시 카피
+# X (Twitter) 게시 카피 — 복사 즉시 게시 가능
 
-## 게시 전략
-
-- **첫 게시**: hero GIF + 1 트윗으로 시작. 반응 보고 thread 풀기.
-- **시간**: 미국 기준 화·수 09:00–11:00 ET (한국 23:00–01:00 KST). 개발자 타임라인 활성.
-- **해시태그**: `#ClaudeCode #VSCode #BuildInPublic` (3개 이내)
-- **태그**: `@AnthropicAI` (Claude 팀이 종종 커뮤니티 툴 RT)
+알고리즘 핵심: **본문에 외부 링크 X** (페널티). 링크는 자기 답글(reply self-thread)에. 이미지가 있는 트윗이 임프레션 ~3-5배.
 
 ---
 
-## V0 — 단발 트윗 (영어, 가장 가벼운 시작)
+# V0 — 단발 트윗 (가장 가벼운 시작)
+
+## 🇺🇸 영문
 
 ```
-Built a VS Code panel that finds every Claude Code slash command on
-your machine — your custom skills, project commands, and every plugin
-you install via /plugin install — and lets you fire them with one
-click. Or one keystroke.
+Got tired of forgetting which Claude Code slash commands I had
+installed (~50 between superpowers, code-review, and my own).
 
-Pixel-art game vibes optional but fun.
+So I built a VS Code panel — with Claude Code itself — that
+auto-finds them all. Click to fire. Keys 1–6 for the top six.
 
-[demo.gif]
-
-#ClaudeCode #VSCode
+Free, MIT, side-project gravity included.
 ```
 
-**문자수**: ~250 (280 한도 OK)
+**첨부**: 라인업 이미지 (`docs/screenshots/buddy-lineup.png`)
+
+**자기 답글** (게시 직후 self-reply):
+```
+Source / install:
+github.com/parksubeom/claude-skills-panel
+marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel
+open-vsx.org/extension/parksubeom/claude-skills-panel (Cursor / Codium / Windsurf)
+```
+
+## 🇰🇷 한국어
+
+```
+Claude Code 슬래시 커맨드 50개 넘어가니까 매번 외워서 타이핑하기
+귀찮아져서, Claude Code로 직접 VS Code 패널 만들었습니다.
+
+자동으로 다 찾아주고 클릭으로 실행. Quick Bar 1-6 키.
+사이드 프로젝트답게 도트 게임 보너스.
+
+무료·MIT.
+```
+
+**첨부**: 라인업 이미지
+
+**자기 답글**:
+```
+설치:
+VS Code: marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel
+Cursor: open-vsx.org/extension/parksubeom/claude-skills-panel
+소스: github.com/parksubeom/claude-skills-panel
+```
 
 ---
 
-## V0 — 단발 트윗 (한국어)
+# V1 — Thread (7-tweet 풀버전)
 
+게시 후 반응이 V0에서 RT 5+ / like 20+ 받으면 1주일 후 thread 발행.
+
+## 🇺🇸 영문 7-tweet
+
+### 1/7 (hook + GIF/lineup)
 ```
-Claude Code 슬래시 커맨드 매번 외워서 타이핑하기 귀찮아서 만든 패널.
-~/.claude/commands, 프로젝트 커맨드, /plugin install 한 모든 플러그인까지
-자동으로 다 찾아서 한 클릭으로 실행됨. 1-6 키 단축키도.
+I built a VS Code panel for Claude Code that auto-finds every
+slash command on your machine and lets me fire any of them with
+one click — or keys 1–6.
 
-도트 게임 분위기는 옵션이지만 보너스.
-
-[demo.gif]
-
-OpenVSX & VS Marketplace에 무료 배포됨.
-```
-
----
-
-## V1 — Thread (영어, 7 트윗)
-
-### 1/7 (hook + GIF)
-```
-I kept forgetting which Claude Code slash commands I had, so I built a
-VS Code panel that auto-finds them all and lets me fire any of them
-with one click.
-
-Free, open source, and somehow turned into a tiny pixel-art game.
-
-[demo.gif]
+Built almost entirely with Claude Code itself. 1 week, ~3000 lines.
 
 🧵
 ```
+첨부: demo.gif 또는 라인업 이미지
 
 ### 2/7 (the problem)
 ```
-The pain: you install superpowers, code-review, skill-creator, plus
-your own ~/.claude/commands/ folder, and now you have ~50+ slash
-commands. Half the time I'd forget the exact name and end up retyping.
+The pain that started this:
 
-#ClaudeCode
+After installing superpowers, code-review, and writing a few of
+my own custom commands in ~/.claude/commands/, I had ~50 slash
+commands. Half of which I'd already forgotten existed.
+
+Typing /comm- and getting ambushed by 4 things I'd never used.
 ```
 
 ### 3/7 (auto-discovery)
 ```
-The panel walks every source on your machine:
-• ~/.claude/skills/ + commands/
-• <project>/.claude/skills/ + commands/
-• ~/.claude/plugins/cache/* (every installed plugin)
+The panel walks every source on your machine, no setup:
 
-No setup. Open the panel and they're all there, grouped by source.
+• ~/.claude/skills/
+• ~/.claude/commands/
+• <project>/.claude/
+• ~/.claude/plugins/cache/* (every plugin you've installed)
 
-[hero.png]
+All grouped by source, fuzzy-searchable, keyboard-navigable.
 ```
+첨부: HERO 스크린샷
 
 ### 4/7 (one-click execution)
 ```
@@ -86,147 +100,130 @@ Click a card → command goes to clipboard.
 Or auto-paste + Enter.
 Or send straight to your terminal.
 
-Plus a Quick Bar with keys 1–6 for the ones you fire all day.
-
-[quickbar-keys.png]
+Plus a Quick Bar that binds your top six to keys 1–6, fires
+from anywhere.
 ```
 
 ### 5/7 (plugin browser)
 ```
-Even nicer: a built-in plugin browser shows everything in
-claude-plugins-official (243 plugins) plus any community marketplace
-you've added. Search, filter, one-click install.
+The unexpectedly useful part:
 
-It's basically the Marketplace UI Claude Code never had.
-
-[marketplace-browser.png]
+A built-in browser for the /plugin marketplace. Claude Code's
+official catalog has 240+ plugins and there's no GUI to discover
+them. The panel reads marketplace.json directly, joins with
+installed_plugins.json, and gives you search + one-click install.
 ```
+첨부: marketplace browser 스크린샷
 
 ### 6/7 (gamification, optional)
 ```
-And because side projects gonna side project: the panel is a tiny
-8-bit game.
+Side-project gravity hit and the buddy character now branches
+into 1 of 10 RPG classes based on your most-used category.
 
-• Skills level up (LV.0 → LV.5)
-• A pixel buddy evolves through 6 stages
-• 16 achievements
-• 3 themes: Dark / Retro CRT / Gameboy LCD
+Codey if you're code-heavy. Gitto if it's mostly /git-*.
+Testra (Paladin) if you're review-driven.
 
-All toggle-off-able if you want a clean panel.
-
-[pixel-themes.png]
+All gamification toggles off in one click.
 ```
+첨부: 라인업 이미지
 
-### 7/7 (install)
+### 7/7 (install + CTA)
 ```
+Free, MIT, ~120 KB, no telemetry by default. Trilingual+
+(en/ko/ja/zh).
+
+Install:
 parksubeom.claude-skills-panel
-• VS Code: https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel
-• Cursor / Codium / Windsurf (OpenVSX): https://open-vsx.org/extension/parksubeom/claude-skills-panel
-• Source: https://github.com/parksubeom/claude-skills-panel
+github.com/parksubeom/claude-skills-panel
 
-Made with Claude Code, naturally. Feedback welcome 🙏
+Curious what slash commands you reach for most — the class-
+matching regex would learn from your set.
 ```
 
----
+## 🇰🇷 한국어 5-tweet (간결 버전)
 
-## V1 — Thread (한국어, 6 트윗)
-
-### 1/6
+### 1/5
 ```
-Claude Code 슬래시 커맨드 매번 외워서 타이핑하기 귀찮아서, 머신에 있는
-모든 /command·/skill·플러그인을 자동으로 찾아 한 클릭으로 실행하는
-VS Code 패널 만들었습니다. 무료·오픈소스.
+Claude Code 슬래시 커맨드 50개 넘어가니까 안 외워져서,
+Claude Code로 직접 VS Code 패널 만들었습니다.
 
-만들다 보니 도트 게임이 됐네요.
-
-[demo.gif]
+자동으로 다 찾아주고 클릭으로 실행. 1주, ~3000줄.
 
 🧵
 ```
+첨부: 라인업 이미지
 
-### 2/6
+### 2/5
 ```
-문제: superpowers·code-review·skill-creator + 내가 만든 commands/까지
-하면 슬래시 커맨드가 50개+. 절반은 이름이 헷갈려서 재타이핑.
+~/.claude/commands, 프로젝트 .claude/, 그리고 /plugin install
+한 모든 플러그인까지 자동 스캔.
 
-해결: 패널이 모든 소스를 자동으로 스캔해서 카드 그리드로 표시.
+카드 클릭 → 클립보드 복사. 또는 자동 붙여넣기 + Enter.
+또는 터미널 직접 전송.
 
-[hero.png]
-```
-
-### 3/6
-```
-실행 모드 3가지:
-• Paste — 클립보드 복사만
-• Auto — 자동 붙여넣기 + Enter
-• Term — 터미널에 직접 전송
-
-Quick Bar에 1-6 키로 자주 쓰는 거 등록하면 어디서든 단축키 한 번.
-
-[quickbar-keys.png]
+Quick Bar 1-6 키로 자주 쓰는 6개 어디서든.
 ```
 
-### 4/6
+### 3/5
 ```
-🛒 Plugin Browser — claude-plugins-official 243개 + 추가한 마켓플레이스
-모두 한 모달에서 검색·카테고리 필터·한 클릭 설치.
+의외의 핵심 기능: /plugin 마켓플레이스 브라우저.
 
-Claude Code의 Marketplace UI가 이렇게 생겨야 했음.
-
-[marketplace-browser.png]
+Claude Code 공식 카탈로그가 240개+인데 검색 GUI가 없음.
+패널이 marketplace.json 직접 파싱해서 검색·필터·한 클릭 설치.
 ```
 
-### 5/6
+### 4/5
 ```
-사이드 프로젝트답게 도트 게이미피케이션:
-• 스킬 레벨업 (LV.0~5)
-• 진화하는 픽셀 버디 (6단계)
-• 16개 업적
-• 테마 3개: Dark / Retro CRT / Gameboy LCD
+사이드 프로젝트답게 도트 게임 됨:
 
-다 토글해서 끌 수 있음 — 싫으면 평범한 패널.
+버디 캐릭터가 사용 패턴 따라 10 클래스 분기. /git-* 많이 쓰면
+Gitto 닌자, /code-review 많이 쓰면 Testra 팔라딘.
 
-[pixel-themes.png]
+다 토글로 끌 수 있음.
 ```
 
-### 6/6
+### 5/5
 ```
-parksubeom.claude-skills-panel
-• VS Code: https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel
-• Cursor: https://open-vsx.org/extension/parksubeom/claude-skills-panel
-• Source: https://github.com/parksubeom/claude-skills-panel
+무료·MIT·기본 텔레메트리 OFF. 4개 언어 (en/ko/ja/zh).
 
-당연히 Claude Code로 만들었습니다. 피드백 환영 🙏
+설치:
+parksubeom.claude-skills-panel (VS Code Marketplace 검색)
+github.com/parksubeom/claude-skills-panel
+
+여러분 top 3 슬래시 커맨드 궁금합니다.
 ```
 
 ---
 
-## 후속 — 1주 후 콘텐츠 아이디어
+# 알고리즘 팁
 
-- **"How I built a feature in 30 minutes with Claude Code"** — 풀플로우 스킬 활용 사례
-- **"3 themes I shipped in one afternoon"** — Dark/Retro/LCD 비교 GIF
-- **"My weekly report from the Skills Panel"** — 자기 사용 통계 markdown export 인용
-- **"243 Claude Code plugins, browseable"** — Plugin Browser 단독 어필
-- **사용자 사례** — DM/이슈로 들어온 실제 사용 사례 RT
+| 행위 | 효과 |
+|---|---|
+| 본문에 외부 링크 | ❌ 임프레션 ~50% 감소 |
+| 자기 답글에 링크 | ✅ 페널티 없음, 클릭 동선 명확 |
+| 이미지/GIF 첨부 | ✅ 임프레션 3-5배 |
+| 4장 carousel | ✅ V1 thread에서 임팩트 큼 |
+| #BuildInPublic | 🟠 한국 dev엔 효과 적음, 영문엔 ~10% 도움 |
+| @AnthropicAI 멘션 | ✅ Claude 팀이 종종 RT (Built with Claude Code 명시 시 ↑) |
+| 게시 후 1시간 응답 | ✅ 알고리즘 가속 |
 
----
+# 게시 시간
 
-## 응답 템플릿 (예상 질문)
+| 청중 | 시간 |
+|---|---|
+| 영문 글로벌 dev | 화·수·목 미국 ET 09:00–11:00 (한국 22:00–24:00 KST) |
+| 한국 dev | 평일 21:00–23:00 KST (퇴근 후) |
 
-> "Cursor에서도 되나요?"
-- "네 — Cursor·Windsurf·Codium 모두 OpenVSX에서 동일하게 설치됩니다."
+# 응답 템플릿
 
-> "오픈소스인가요? 라이선스?"
-- "네, MIT. github.com/parksubeom/claude-skills-panel"
+> **"Cursor에서도 되나요?"**
+- "네 — Cursor / Windsurf / Codium 모두 OpenVSX에서 동일하게 설치됩니다."
 
-> "다른 IDE 지원?"
-- "현재는 VS Code 호환 IDE (Cursor·Windsurf·Codium 포함). JetBrains는 백로그입니다."
+> **"Open source?"**
+- "Yep, MIT. github.com/parksubeom/claude-skills-panel"
 
-> "데이터 수집?"
-- "기본 OFF. 첫 실행 시 익명 카운터 opt-in을 한 번 묻고, 거부하면 그걸로 끝. 스킬 이름 같은 건 절대 안 보냅니다."
+> **"Telemetry?"**
+- "Off by default. First run shows a single banner asking permission for anonymous feature counters (no command names, no content). Say no and that's it."
 
-> "왜 게임처럼 만들었나?"
-- "본 기능 (스킬 트리거)은 카드 클릭이 끝이라 너무 단순해서, 재미 요소가 자연스럽게 늘어났습니다. 다 토글로 끌 수 있어요."
-
-> "Claude Code 안 쓰면?"
-- "이 패널은 Claude Code 사용자가 대상이라 다른 환경에선 의미 없습니다. /plugin·/command 시스템에 의존."
+> **"제일 많이 쓰는 커맨드 뭐예요?"**
+- "/full-flow, /commit-prepare, /code-review가 압도적. 그래서 클래스 매칭 regex가 처음엔 그쪽으로 편향됐어요."
