@@ -256,6 +256,26 @@ OP 첫 댓글은 r/ClaudeAI 동일.
 - 댓글 받으면 30분 안에 응답 (알고리즘 가속)
 - "top 3" 답변이 모이면 다음 페이즈에 카테고리 매칭 regex 개선에 활용
 
+# r/ClaudeAI 게시 막힘 트러블슈팅
+
+| AutoModerator 메시지 | 원인 | 해결 |
+|---|---|---|
+| "Sorry your account is too new to post" | 계정 age 부족 (보통 며칠~몇 주) | 며칠 대기 + 다른 글에 댓글로 활동 누적 |
+| "OP karma > 50 required" / 자동 제거 | 계정 karma < 50 | r/learnprogramming, r/AskProgramming 등에서 답변으로 karma 빌드 |
+| 본문 자체가 Rule 7 위반 | 광고 톤, 링크 다수, "free MIT" 강조 | 아래 체크리스트로 정렬 |
+
+**계정 막힘 (age/karma) 동안 평행 진행:**
+
+| 채널 | 요건 | 추천 |
+|---|---|---|
+| GeekNews (news.hada.io) | 가입만 하면 즉시 | 🔴 한국 트래픽 핵심 |
+| OKKY | 활동 무관 | 🔴 한국 dev 핵심 |
+| velog / Hashnode KR | 본인 블로그 | 🟠 SEO 자산 |
+| dev.to | 무관 | 🟠 영문 SEO |
+| r/vscode | 보통 r/ClaudeAI보다 관대 | 🟠 (계정 age는 확인 필요) |
+| r/cursor | 보통 r/ClaudeAI보다 관대 | 🟠 |
+| Show HN | account ~30일 | 🟢 며칠 후 |
+
 # r/ClaudeAI Rule 7 체크리스트
 
 이 sub는 자기 프로젝트 게시에 대해 Rule 7로 명시적 요건이 있습니다. 본문이 모두 충족하는지 게시 전 확인:
