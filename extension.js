@@ -432,22 +432,12 @@ function renderHtml(webview, skills) {
   // Falls back gracefully if a class PNG hasn't been delivered by the designer yet.
   const buddyImg = (() => {
     if (!PIXEL_DIR) return null;
-    // LV.1/2 share the common Egg/Hatchling sprites. LV.3+ resolves to the
-    // artist-supplied class PNG (10 are shipped). If the user is past the
-    // branch threshold but somehow has no class set yet, fall back to the
-    // Hatchling sprite — getCharacter() will assign a class on the next read.
-    const candidates = [];
-    if (character.stage <= 1 || !character.class) {
-      candidates.push(`buddy/stage${character.stage}.png`);
-      candidates.push('buddy/stage0.png');
-    } else {
-      candidates.push(`buddy/class/${character.class}.png`);
-      candidates.push('buddy/stage1.png'); // last-resort fallback
-    }
-    for (const rel of candidates) {
-      const abs = path.join(PIXEL_DIR, rel);
-      if (fs.existsSync(abs)) return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
-    }
+    // Every level uses the class sprite (v0.35+). Brand-new users with no
+    // recorded actions yet have no class; they see the default 'codey' until
+    // their first slash-command click locks in their actual class.
+    const cls = character.class || 'codey';
+    const abs = path.join(PIXEL_DIR, 'buddy', 'class', `${cls}.png`);
+    if (fs.existsSync(abs)) return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
     return null;
   })();
   const buddyProgress = character.nextThreshold
@@ -2364,9 +2354,12 @@ function renderHtml(webview, skills) {
             <button class="btn" id="buddy-save-name">${t('modal.buddy.save')}</button>
           </div>
           <div class="buddy-stage">
-            ${character.class
-              ? `${userConfig.BUDDY_CLASSES.find((c) => c.id === character.class)?.emoji || ''} <strong>${t('class.' + character.class + '.name')}</strong> <span class="hint">${t('class.' + character.class + '.role')} · LV.${character.stage + 1}/5</span>`
-              : `${escapeHtml(character.stageName)} <span class="hint">LV.${character.stage + 1}/5${character.stage < userConfig.BRANCH_AT_LEVEL ? ' · ' + t('modal.buddy.preBranch', { remaining: Math.max(0, userConfig.BUDDY_THRESHOLDS[userConfig.BRANCH_AT_LEVEL] - character.actions) }) : ''}</span>`}
+            ${(() => {
+              const cls = character.class || 'codey';
+              const meta = userConfig.BUDDY_CLASSES.find((c) => c.id === cls);
+              const stageLabel = t('stage.' + character.stage + '.name');
+              return `${meta?.emoji || ''} <strong>${stageLabel} ${t('class.' + cls + '.name')}</strong> <span class="hint">${t('class.' + cls + '.role')} · LV.${character.stage + 1}/5</span>`;
+            })()}
           </div>
           <div class="buddy-progress">
             <div class="buddy-progress-bar" style="width: ${buddyProgress}%"></div>
@@ -2394,7 +2387,7 @@ function renderHtml(webview, skills) {
 
       <div class="skill-stats-section">
         <div class="skill-stats-title">
-          ${character.class ? t('modal.buddy.skillStatsAfter') : t('modal.buddy.skillStatsBefore')}
+          ${t('modal.buddy.skillStats')}
         </div>
         <div class="skill-stats-bars">
           ${(() => {
@@ -2989,34 +2982,31 @@ window.addEventListener('message', (e) => {
     if (streakEl) streakEl.textContent = '🔥 ' + t('footer.streakDays', { days: m.streak });
     if (totalEl) totalEl.textContent = '📊 ' + t('footer.totalCopies', { count: m.totalCopies });
 
-    // Buddy stage-up celebration
-    if (m.buddy && m.buddy.nextStage > m.buddy.prevStage) {
-      const className = m.buddy.class ? t('class.' + m.buddy.class + '.name') : m.buddy.stageName;
-      const role = m.buddy.class ? t('class.' + m.buddy.class + '.role') : '';
+    // Class lock (first action) — single celebratory toast.
+    if (m.buddy && m.buddy.branchedTo) {
       setTimeout(() => {
-        // If this stage-up is the moment we *branched* to a class, show a
-        // stronger "you are now Class X" toast; otherwise the regular evolve.
-        const msgKey = m.buddy.branchedTo ? 'toast.classBranch' : 'toast.evolution';
-        showToast(t(msgKey, {
+        showToast(t('toast.classBranch', {
           name: m.buddy.character.name || 'Claude',
-          stage: className,
-          role,
+          class: t('class.' + m.buddy.branchedTo + '.name'),
+          role: t('class.' + m.buddy.branchedTo + '.role'),
         }));
         beep({ freq: 523, duration: 0.12, vol: 0.08 });
         setTimeout(() => beep({ freq: 659, duration: 0.12, vol: 0.08 }), 130);
         setTimeout(() => beep({ freq: 784, duration: 0.12, vol: 0.08 }), 260);
         setTimeout(() => beep({ freq: 1047, duration: 0.2, vol: 0.08 }), 390);
       }, 400);
-    } else if (m.buddy && m.buddy.branchedTo) {
-      // Branch can fire on the same action as a stage-up (covered above) or on
-      // its own when migrating an existing user past the threshold — handle
-      // the migration case explicitly.
+    } else if (m.buddy && m.buddy.nextStage > m.buddy.prevStage) {
+      // Subsequent level-ups within the same class.
+      const className = m.buddy.class ? t('class.' + m.buddy.class + '.name') : '';
+      const stageName = t('stage.' + m.buddy.nextStage + '.name');
       setTimeout(() => {
-        showToast(t('toast.classBranch', {
+        showToast(t('toast.evolution', {
           name: m.buddy.character.name || 'Claude',
-          stage: t('class.' + m.buddy.branchedTo + '.name'),
-          role: t('class.' + m.buddy.branchedTo + '.role'),
+          stage: stageName + ' ' + className,
         }));
+        beep({ freq: 523, duration: 0.12, vol: 0.08 });
+        setTimeout(() => beep({ freq: 659, duration: 0.12, vol: 0.08 }), 130);
+        setTimeout(() => beep({ freq: 784, duration: 0.12, vol: 0.08 }), 260);
       }, 400);
     }
     // Update toolbar avatar tooltip on each tick (image refreshes on next render)

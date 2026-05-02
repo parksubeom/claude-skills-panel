@@ -1,20 +1,22 @@
-# Buddy 시스템 — 클래스 분기 진화
+# Buddy 시스템 — 클래스부터 시작 (v0.35+)
 
-v0.29.0부터 적용되는 새 진화 시스템.
+v0.35부터 시작 단계의 Egg/Hatchling이 폐기되고 **첫 사용 시점부터 클래스가 결정**됩니다. 모든 LV에서 클래스 PNG를 사용.
 
 ---
 
 ## 핵심 컨셉
 
-**단일 캐릭터가 사용 패턴에 따라 10개 클래스 중 하나로 분기 진화**한다. 모든 사용자가 같은 알에서 시작해서, 어떤 슬래시 커맨드를 가장 많이 썼느냐로 직업이 결정된다는 RPG 메타포.
+**첫 슬래시 커맨드를 누르는 순간 그 카테고리로 클래스가 결정**됩니다. 그 후 같은 클래스 안에서 LV up.
 
 ```
-LV.1 Egg            (action 0~9)         공통
-LV.2 Hatchling      (action 10~49)       공통
-LV.3 [Class]        (action 50~149)      ← 50회 시점에 클래스 결정
-LV.4 [Class] Adept  (action 150~499)     클래스 유지, 시각만 강화
-LV.5 [Class] Master (action 500+)        최종 폼
+LV.1 Apprentice [Class]  (action 0~9)    ← 첫 사용 시 클래스 락
+LV.2 Adept [Class]        (action 10~49)
+LV.3 Skilled [Class]      (action 50~149)
+LV.4 Master [Class]       (action 150~499)
+LV.5 Legend [Class]       (action 500+)
 ```
+
+이전 v0.29~v0.34는 LV.3에서 분기였지만, 시작 단계의 공통 알/부화 단계가 사용자 첫 인상을 약하게 만든다는 판단으로 폐기. 이제 첫 클릭부터 RPG.
 
 ---
 
@@ -51,14 +53,14 @@ LV.5 [Class] Master (action 500+)        최종 폼
       "sheety": 6, "slidey": 0, "pdfox": 1, "webbie": 2,
       "datia": 1, "gitto": 9
     },
-    "class": null,
-    "classLockedAt": null,
+    "class": "codey",
+    "classLockedAt": "2026-05-02T00:00:00.000Z",
     "name": "Claude"
   }
 }
 ```
 
-`class`는 `null`이면 아직 LV.2 이하. 50회 도달 시점에 `skillStats`에서 가장 큰 카운트를 가진 클래스로 결정 (동률은 알파벳 순). 결정 후 `classLockedAt`에 ISO timestamp.
+`class`는 첫 액션 후 항상 set. `decideClass(skillStats)`가 max-count 카테고리로 결정 (동률은 알파벳 순).
 
 ---
 
@@ -66,7 +68,7 @@ LV.5 [Class] Master (action 500+)        최종 폼
 
 ```js
 function decideClass(skillStats) {
-  let max = -1, winner = 'codey';
+  let max = -1, winner = 'codey'; // 첫 사용 시점에 skillStats가 비어있으면 codey
   for (const cls of CLASS_IDS) {
     const count = skillStats[cls] || 0;
     if (count > max) { max = count; winner = cls; }
@@ -78,8 +80,8 @@ function decideClass(skillStats) {
 `recordUsage()`가 호출될 때마다:
 1. 슬래시 커맨드 이름을 키워드 매칭 → 카테고리 결정 → `skillStats[cat]++`
 2. `actions` 누적
-3. `actions === 50` 직후 `class === null`이면 `decideClass()` 실행, `class` + `classLockedAt` 저장
-4. 클래스 결정 토스트 webview에 push
+3. `class === null`이면 `decideClass()` 실행 → `class` + `classLockedAt` 저장 → 클래스 결정 토스트
+4. LV up 토스트 (LV 변경 시)
 
 ---
 
@@ -94,16 +96,17 @@ function decideClass(skillStats) {
 
 ## 시각 표현
 
-### LV.1 ~ LV.2 (공통)
-- LV.1 Egg: `assets/pixel-icons/buddy/egg.png`
-- LV.2 Hatchling: `assets/pixel-icons/buddy/hatchling.png`
+모든 LV가 동일 클래스 PNG 사용:
+- `assets/pixel-icons/buddy/class/<id>.png` — 10장
 
-### LV.3 ~ LV.5 (클래스별)
-- `assets/pixel-icons/buddy/class/<id>.png`
-- LV.4 Adept: 같은 PNG + 코드 오버레이 (가벼운 황금 outline)
-- LV.5 Master: 같은 PNG + 더 강한 오버레이 (별빛 파티클 + 더 진한 outline)
+LV별 구분은 코드 오버레이로:
+- LV.1 Apprentice: 기본
+- LV.2 Adept: 약한 outline
+- LV.3 Skilled: 황금 outline
+- LV.4 Master: 황금 outline + 별빛 파티클
+- LV.5 Legend: 강한 outline + 파티클 + 회전 효과
 
-→ **디자인 부담 12장** (Egg, Hatchling, 클래스 10개). LV.4·5 강화는 코드.
+→ **디자인 부담 10장**. LV별 강화는 코드 사이드.
 
 ---
 
@@ -112,9 +115,14 @@ function decideClass(skillStats) {
 `character.skillStats`가 없는 사용자:
 - 빈 객체 `{}` 초기화
 - 다음 사용부터 카운트 시작
-- 만약 `actions >= 50` 이미인데 `class === null`이면, 즉시 `class = 'codey'` (default), 사용자가 Reincarnate 버튼으로 다른 클래스 선택 가능
 
-기존 6단계 (Egg/Hatchling/Kitten/Cat/Monkey/Dragon) → 5단계로 압축. `BUDDY_NAMES` 배열은 `getCurrentStageName(character)` 함수로 대체.
+`actions > 0`인데 `class === null`이면 (v0.34 이전 사용자):
+- `getCharacter()` 호출 시 즉시 `decideClass(skillStats)` 실행
+- 결과 → `class` + `classLockedAt` 자동 set
+
+스테이지 이름 변경:
+- v0.29~v0.34: Egg / Hatchling / Novice / Adept / Master
+- v0.35+: Apprentice / Adept / Skilled / Master / Legend
 
 ---
 

@@ -2,6 +2,38 @@
 
 All notable changes to this extension are documented here.
 
+## [0.35.0] — 2026-05-02
+
+### Changed — Buddy starts as a class from the very first action
+
+The pre-branch Egg / Hatchling phase (LV.1-2 generic sprites in v0.29-0.34) is gone. Class is now decided **on the first slash-command click**, and every level uses the class sprite.
+
+#### Stage renames
+| LV | Threshold | v0.34 name | v0.35 name |
+|---|---|---|---|
+| 1 | 0 | Egg / Hatchling generic | **Apprentice [Class]** |
+| 2 | 10 | Novice / Adept | **Adept [Class]** |
+| 3 | 50 | branch point | **Skilled [Class]** |
+| 4 | 150 | Adept | **Master [Class]** |
+| 5 | 500 | Master | **Legend [Class]** |
+
+#### Removed
+- `assets/pixel-icons/buddy/stage0.png` / `stage1.png` (Egg, Hatchling) — no longer referenced
+- `scripts/build-buddy-icons.js` retired; `npm run build:buddy` now only invokes `build-buddy-classes.js`
+- `assets/pixel-icons/buddy/stages.json` (was unused at runtime anyway)
+- i18n keys `modal.buddy.preBranch`, `modal.buddy.skillStatsBefore`, `modal.buddy.skillStatsAfter` (replaced by `modal.buddy.skillStats`)
+
+#### Added
+- `stage.0.name` … `stage.4.name` keys per locale (en/ko/ja/zh) — `Apprentice` / `견습` / `見習い` / `学徒` etc.
+- New toast.classBranch wording: `"⚔️ {name} starts as {class} the {role}!"` (en) — fires on first action, not LV.3
+- New toast.evolution wording: `"🎉 {name} reached {stage}!"` (LV-up within the same class)
+
+#### Migration
+Existing users with `actions > 0` but no `class` set are auto-decided on next `getCharacter()` read using their current `skillStats` (or default to `codey` if empty).
+
+#### Sprite resolver simplification
+`extension.js` buddy resolver dropped the multi-stage fallback ladder. Single line: `assets/pixel-icons/buddy/class/<id>.png` always. Default `codey` for the brief moment before the first action.
+
 ## [0.34.0] — 2026-05-01
 
 ### Listing rewrite — first-time visitor focus

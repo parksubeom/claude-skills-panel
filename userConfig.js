@@ -159,10 +159,10 @@ function recordUsage(name, source) {
   }
   const nextStage = buddyStageFor(c.actions);
 
-  // Class branch: when reaching LV.3 for the first time, lock in the class
-  // based on which category the user has touched most.
+  // Class lock: the first action a user records decides their class.
+  // After this, the class only changes when the user clicks Reincarnate.
   let branchedTo = null;
-  if (nextStage >= BRANCH_AT_LEVEL && !c.class) {
+  if (!c.class) {
     c.class = decideClass(c.skillStats);
     c.classLockedAt = now;
     branchedTo = c.class;
@@ -193,14 +193,16 @@ function recordUsage(name, source) {
   };
 }
 
-// 5-stage class-branch system (v0.29+).
-// LV.1 Egg → LV.2 Hatchling (common) → LV.3-5 [class-specific].
-// Class is decided once, at action 50, by max-count category in skillStats.
+// 5-stage class-from-the-start system (v0.35+).
+// Every level uses the class sprite. Class is locked the moment the user
+// records their first action. No more Egg / Hatchling pre-branch phase.
 const BUDDY_THRESHOLDS = [0, 10, 50, 150, 500];
-const STAGE_NAMES_GENERIC = ['Egg', 'Hatchling', 'Novice', 'Adept', 'Master'];
-// Legacy export kept for any downstream code; remapped onto the new 5-stage system.
+const STAGE_NAMES_GENERIC = ['Apprentice', 'Adept', 'Skilled', 'Master', 'Legend'];
+// Legacy export kept for any downstream code.
 const BUDDY_NAMES = STAGE_NAMES_GENERIC;
-const BRANCH_AT_LEVEL = 2; // LV.3 (zero-indexed = 2)
+// Branching happens on the first action, before any threshold check.
+// Kept as 0 for any code that still references it (means "always branched").
+const BRANCH_AT_LEVEL = 0;
 
 function buddyStageFor(actions) {
   for (let i = BUDDY_THRESHOLDS.length - 1; i >= 0; i--) {
@@ -283,10 +285,10 @@ function getCharacter() {
   if (!c.skillStats) c.skillStats = {};
   if (!('class' in c)) c.class = null;
   if (!('classLockedAt' in c)) c.classLockedAt = null;
-  // Auto-decide class for users already past the branch threshold but missing
-  // a class (migration from pre-0.29 data).
+  // Class is always set once the user has used anything; auto-decide for
+  // existing-but-classless users (migration from pre-0.35 data).
   c.stage = buddyStageFor(c.actions);
-  if (c.stage >= BRANCH_AT_LEVEL && !c.class) {
+  if (c.actions > 0 && !c.class) {
     c.class = decideClass(c.skillStats);
     c.classLockedAt = new Date().toISOString();
   }
@@ -338,7 +340,7 @@ function recordBuddyAction(skillName, source) {
   // VIT: bumped daily by streak (handled separately)
   // LCK: bumped on achievements (handled separately)
   const nextStage = buddyStageFor(c.actions);
-  if (nextStage >= BRANCH_AT_LEVEL && !c.class) {
+  if (!c.class) {
     c.class = decideClass(c.skillStats);
     c.classLockedAt = new Date().toISOString();
   }
