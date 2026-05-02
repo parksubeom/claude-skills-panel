@@ -184,7 +184,7 @@ function recordUsage(name, source) {
     buddy: {
       prevStage,
       nextStage,
-      stageName: stageNameFor(nextStage, c.class),
+      stageName: STAGE_NAMES_EN[nextStage],
       class: c.class,
       branchedTo,
       prevClass,
@@ -195,14 +195,11 @@ function recordUsage(name, source) {
 
 // 5-stage class-from-the-start system (v0.35+).
 // Every level uses the class sprite. Class is locked the moment the user
-// records their first action. No more Egg / Hatchling pre-branch phase.
+// records their first action — no Egg/Hatchling pre-branch phase exists.
+// English stage names are kept here as a host-side fallback only; the
+// webview always renders the localized `stage.<n>.name` i18n key.
 const BUDDY_THRESHOLDS = [0, 10, 50, 150, 500];
-const STAGE_NAMES_GENERIC = ['Apprentice', 'Adept', 'Skilled', 'Master', 'Legend'];
-// Legacy export kept for any downstream code.
-const BUDDY_NAMES = STAGE_NAMES_GENERIC;
-// Branching happens on the first action, before any threshold check.
-// Kept as 0 for any code that still references it (means "always branched").
-const BRANCH_AT_LEVEL = 0;
+const STAGE_NAMES_EN = ['Apprentice', 'Adept', 'Skilled', 'Master', 'Legend'];
 
 function buddyStageFor(actions) {
   for (let i = BUDDY_THRESHOLDS.length - 1; i >= 0; i--) {
@@ -267,15 +264,6 @@ function decideClass(skillStats) {
 // INT growth from thinking/planning skills, DEX from quick triggers, etc.
 const INT_KEYWORDS = /(brainstorm|writing-plans|writing-skills|planning|review|debug|verif|simplif|systematic)/i;
 
-function stageNameFor(stage, classId) {
-  if (stage < BRANCH_AT_LEVEL) return STAGE_NAMES_GENERIC[stage];
-  if (!classId) return STAGE_NAMES_GENERIC[stage]; // pre-branch fallback
-  const suffix = stage === BRANCH_AT_LEVEL ? '' : ' ' + STAGE_NAMES_GENERIC[stage];
-  // Class display name comes from i18n on the webview side; here we just hand
-  // back the raw class id so the renderer can localize.
-  return classId + (suffix ? ' (' + suffix.trim() + ')' : '');
-}
-
 function getCharacter() {
   const cfg = read();
   const c = cfg.character || {};
@@ -292,7 +280,7 @@ function getCharacter() {
     c.class = decideClass(c.skillStats);
     c.classLockedAt = new Date().toISOString();
   }
-  c.stageName = STAGE_NAMES_GENERIC[c.stage];
+  c.stageName = STAGE_NAMES_EN[c.stage];
   c.nextThreshold = BUDDY_THRESHOLDS[c.stage + 1] || null;
   c.currentThreshold = BUDDY_THRESHOLDS[c.stage];
   return c;
@@ -577,14 +565,10 @@ module.exports = {
   bumpCharacterStat,
   buddyStageFor,
   BUDDY_THRESHOLDS,
-  BUDDY_NAMES,
   BUDDY_CLASSES,
   BUDDY_CLASS_IDS,
-  STAGE_NAMES_GENERIC,
-  BRANCH_AT_LEVEL,
   classifySkill,
   decideClass,
-  stageNameFor,
   reincarnate,
   getLocale,
   setLocale,

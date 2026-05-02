@@ -2,6 +2,24 @@
 
 All notable changes to this extension are documented here.
 
+## [0.36.0] — 2026-05-02
+
+### Removed — dead `stage` plumbing
+
+After v0.35 collapsed the buddy system to "always class from action 0", several constants and helpers were carrying weight for a flow that no longer exists. This release sweeps them out.
+
+userConfig.js:
+- `BRANCH_AT_LEVEL` constant (was already 0; checked nowhere meaningful) — deleted.
+- `STAGE_NAMES_GENERIC` → renamed to `STAGE_NAMES_EN` and made internal-only. The webview already renders the localized `stage.<n>.name` key per locale; this stays as a host-side fallback for `c.stageName` only.
+- `stageNameFor()` helper — its branch-aware logic was vestigial. Replaced with a direct `STAGE_NAMES_EN[stage]` lookup at the two call sites.
+- `BUDDY_NAMES`, `STAGE_NAMES_GENERIC`, `BRANCH_AT_LEVEL`, `stageNameFor` removed from the exports object.
+
+extension.js:
+- `const BUDDY_NAMES = userConfig.BUDDY_NAMES` import removed.
+- Quick Bar locked-slot tooltip switched from `BUDDY_NAMES[i]` to `t('stage.' + i + '.name')` so the unlock-stage hint is now properly localized in ko/ja/zh (was English-only before).
+
+No behavior change; just less surface area.
+
 ## [0.35.0] — 2026-05-02
 
 ### Changed — Buddy starts as a class from the very first action

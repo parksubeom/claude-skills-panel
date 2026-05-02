@@ -427,9 +427,6 @@ function renderHtml(webview, skills) {
 
   // Buddy character
   const character = userConfig.getCharacter();
-  const BUDDY_NAMES = userConfig.BUDDY_NAMES;
-  // Stage 0/1: common Egg/Hatchling. Stage 2+: class-specific sprite (after branch).
-  // Falls back gracefully if a class PNG hasn't been delivered by the designer yet.
   const buddyImg = (() => {
     if (!PIXEL_DIR) return null;
     // Every level uses the class sprite (v0.35+). Brand-new users with no
@@ -626,7 +623,7 @@ function renderHtml(webview, skills) {
           const key = i + 1;
           const locked = i >= unlockedSlots;
           if (locked) {
-            const stageNeed = BUDDY_NAMES[i] || '';
+            const stageNeed = t('stage.' + i + '.name');
             return `<div class="qslot locked" data-slot="${i}" data-key="${key}" title="${t('quickbar.locked', { stage: stageNeed })}">
               <span class="qslot-key">${key}</span>
               <span class="qslot-lock">🔒</span>
