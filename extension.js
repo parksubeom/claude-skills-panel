@@ -1112,9 +1112,14 @@ function renderHtml(webview, skills) {
   /* Quick bar */
   .quickbar-section { margin-bottom: 18px; }
   .quickbar {
+    /* Fixed 6-column grid so empty/filled/locked slots all stay the same
+       width and never overlap or wrap, even on narrow panels. minmax(0, 1fr)
+       lets each slot shrink to fit very narrow viewports without busting
+       the grid line. container-type lets the @container query below adapt
+       on truly tiny widths without depending on the viewport. */
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
     padding: 8px;
     border: 2px solid var(--accent-2);
     background:
@@ -1130,9 +1135,17 @@ function renderHtml(webview, skills) {
       100% calc(100% - 6px), calc(100% - 6px) 100%,
       6px 100%, 0 calc(100% - 6px)
     );
+    container-type: inline-size;
+  }
+  /* On extremely narrow panels (activity-bar mode under ~280px), drop to a
+     2-row grid so slot contents stay legible instead of being squeezed
+     into 30px columns. */
+  @container (max-width: 280px) {
+    .quickbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .qslot {
     all: unset;
+    box-sizing: border-box;
     cursor: pointer;
     position: relative;
     display: flex;
@@ -1141,7 +1154,11 @@ function renderHtml(webview, skills) {
     justify-content: center;
     gap: 4px;
     padding: 10px 4px 8px;
+    /* Explicit width:100% makes the empty <div> slots match the filled
+       <button> slots; without this they were sometimes shrinking to
+       content width and visually overlapping the next slot. */
     width: 100%;
+    min-width: 0;
     min-height: 90px;
     border: 3px solid var(--frame);
     background: linear-gradient(180deg, var(--tile-bg) 0%, var(--tile-bg-2) 100%);

@@ -2,6 +2,18 @@
 
 All notable changes to this extension are documented here.
 
+## [0.38.0] — 2026-05-02
+
+### Fixed — Quick Bar layout never collapses on empty slots
+
+Empty / locked Quick Bar slots could visually overlap or shrink against filled ones, especially on narrow panels — a regression from `auto-fit` + `minmax(72px, 1fr)` behaving differently for `<div>` (empty/locked) vs `<button>` (filled) grid items, plus `all: unset` not setting `box-sizing` consistently across both.
+
+- `.quickbar` now uses `grid-template-columns: repeat(6, minmax(0, 1fr))` — fixed 6-column grid that always lays out cleanly regardless of which slots are empty.
+- `.qslot` gets explicit `box-sizing: border-box` and `min-width: 0` so empty `<div>` slots match the width of filled `<button>` slots and never shrink to content.
+- Added a container query (`@container (max-width: 280px)`) that drops to a 2-row 3-column grid on activity-bar narrow mode, so slot contents stay legible instead of being squeezed into ~30px columns.
+
+The Quick Bar is now demo-GIF-stable: open the panel with no slots assigned and you see a clean uniform 6-slot grid every time.
+
 ## [0.37.0] — 2026-05-02
 
 ### Changed — Reincarnate now actually reincarnates
