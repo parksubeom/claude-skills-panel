@@ -286,13 +286,20 @@ function getCharacter() {
   return c;
 }
 
-// Reset class so the next action picks again from current skillStats.
-// skillStats are intentionally preserved (no penalty).
+// Reset class AND the per-category skillStats counters so the next action
+// picks based on a fresh slate. LV (actions), the four character stats,
+// achievements, and earned content are intentionally preserved.
+//
+// Why we wipe skillStats: in v0.36 and earlier we kept the counters and the
+// `decideClass()` would just re-pick the same winner — making Reincarnate a
+// no-op for users who wanted to switch classes intentionally. v0.37 makes
+// the button do what users expect: their next slash-command click decides.
 function reincarnate() {
   const cfg = read();
   if (!cfg.character) cfg.character = {};
   cfg.character.class = null;
   cfg.character.classLockedAt = null;
+  cfg.character.skillStats = {};
   write(cfg);
   return cfg;
 }

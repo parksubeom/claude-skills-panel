@@ -150,7 +150,7 @@ const STRINGS = {
     'modal.buddy.statLckDesc': '+5 for every achievement earned',
     'modal.buddy.skillStats': 'Skill usage by category — current class highlighted.',
     'modal.buddy.reincarnate': '🔄 Reincarnate',
-    'modal.buddy.reincarnateConfirm': 'Reset class? Your skill counts are kept; the next action picks a new class.',
+    'modal.buddy.reincarnateConfirm': 'Reset class and category counts? Your next slash-command click decides the new class. LV, achievements, and total usage stay.',
 
     'stage.0.name': 'Apprentice',
     'stage.1.name': 'Adept',
@@ -392,7 +392,7 @@ const STRINGS = {
     'modal.buddy.statLckDesc': '업적 1개당 +5',
     'modal.buddy.skillStats': '카테고리별 사용량 — 현재 클래스 강조.',
     'modal.buddy.reincarnate': '🔄 재진화',
-    'modal.buddy.reincarnateConfirm': '클래스를 초기화할까요? 사용 카운트는 유지되고 다음 액션에서 새 클래스가 결정됩니다.',
+    'modal.buddy.reincarnateConfirm': '클래스와 카테고리 카운트를 초기화할까요? 다음 슬래시 커맨드 사용으로 새 클래스가 결정됩니다. LV, 업적, 누적 사용량은 그대로 유지됩니다.',
 
     'stage.0.name': '견습',
     'stage.1.name': '숙련',
@@ -628,7 +628,7 @@ const STRINGS = {
     'modal.buddy.statLckDesc': '実績 1 件ごとに +5',
     'modal.buddy.skillStats': 'カテゴリ別使用量 — 現在のクラスを強調。',
     'modal.buddy.reincarnate': '🔄 転生',
-    'modal.buddy.reincarnateConfirm': 'クラスをリセットしますか? 使用カウントは保持され、次のアクションで新しいクラスが決まります。',
+    'modal.buddy.reincarnateConfirm': 'クラスとカテゴリ カウントをリセットしますか? 次のスラッシュコマンドで新しいクラスが決まります。LV・実績・累計使用量は維持されます。',
 
     'stage.0.name': '見習い',
     'stage.1.name': '熟練',
@@ -864,7 +864,7 @@ const STRINGS = {
     'modal.buddy.statLckDesc': '每个成就 +5',
     'modal.buddy.skillStats': '按类别使用情况 — 当前职业突出显示。',
     'modal.buddy.reincarnate': '🔄 转生',
-    'modal.buddy.reincarnateConfirm': '重置职业?使用计数保留;下一次操作将选择新职业。',
+    'modal.buddy.reincarnateConfirm': '重置职业和类别计数?下一次斜杠命令将决定新职业。LV、成就、累计使用量保留。',
 
     'stage.0.name': '学徒',
     'stage.1.name': '熟练',

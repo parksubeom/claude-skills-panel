@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "Stop typing /commit-prepare from memory. Finds every Claude Code slash command on your machine — your skills, project commands, all installed plugins — and fires it with one click or keys 1–6. Built-in plugin marketplace browser. Free, MIT. EN · 한국어 · 日本語 · 中文.",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",

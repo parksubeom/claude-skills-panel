@@ -2,6 +2,31 @@
 
 All notable changes to this extension are documented here.
 
+## [0.37.0] — 2026-05-02
+
+### Changed — Reincarnate now actually reincarnates
+
+The 🔄 Reincarnate button on the character sheet was almost a no-op
+in v0.36 and earlier: it cleared `class` but kept `skillStats`, so
+`decideClass()` re-elected the same winner on the next action. Users
+who wanted to switch classes had to grind a new category until its
+count overtook the previous one.
+
+v0.37 makes Reincarnate do what users expect: **the next slash-command
+click decides the new class from a fresh slate.**
+
+`userConfig.reincarnate()` now also wipes `character.skillStats = {}`
+in addition to nulling `class` and `classLockedAt`.
+
+Preserved (no penalty):
+- `actions` (so LV doesn't drop)
+- `stats` (INT/DEX/VIT/LCK)
+- `achievements`
+- All earned content
+
+Confirm dialog text updated in en/ko/ja/zh to reflect the broader
+reset and the explicit list of what's preserved.
+
 ## [0.36.0] — 2026-05-02
 
 ### Removed — dead `stage` plumbing
