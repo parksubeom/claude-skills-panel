@@ -3,3 +3,6 @@ node_modules/
 .DS_Store
 source-icons.png
 .claude/
+
+# md 파일은 기본적으로 추적하지 않음 (사용자가 명시적으로 요청 시에만 추적)
+*.md
