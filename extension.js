@@ -6,6 +6,25 @@ const { pickIcon } = require('./iconMap');
 const userConfig = require('./userConfig');
 const achievements = require('./achievements');
 const i18n = require('./i18n/strings');
+const tokenUsage = require('./tokenUsage');
+
+// Token tracking lifecycle — only running when cfg.meta.trackTokens is on.
+// Default OFF so that JSONL session files are never read unless the user
+// explicitly opts in.
+let _tokenInterval = null;
+function startTokenTracking() {
+  if (_tokenInterval) return;
+  const cfg = userConfig.read();
+  if (!cfg.meta || !cfg.meta.trackTokens) return;
+  try { tokenUsage.scanAll(); } catch {}
+  _tokenInterval = setInterval(() => {
+    try { tokenUsage.scanAll(); } catch {}
+  }, 30000);
+}
+function stopTokenTracking() {
+  if (_tokenInterval) { clearInterval(_tokenInterval); _tokenInterval = null; }
+  tokenUsage.reset();
+}
 
 // Dispatch slash skill execution.
 //   paste    → clipboard only (caller already wrote) — user pastes manually
@@ -340,7 +359,12 @@ function renderHtml(webview, skills) {
   const t = i18n.tFor(locale);
   const theme = userConfig.getTheme();
   const customGroups = userConfig.getGroups();
-  const enriched = skills.map((s) => userConfig.applyOverrides(s, cfg));
+  const trackTokens = !!(cfg.meta && cfg.meta.trackTokens);
+  const enriched = skills.map((s) => {
+    const e = userConfig.applyOverrides(s, cfg);
+    e.tokenStats = trackTokens ? tokenUsage.getStatsFor(s.name) : null;
+    return e;
+  });
 
   const grouped = {};
   for (const s of enriched) {
@@ -387,6 +411,13 @@ function renderHtml(webview, skills) {
     const s = skillByName[t.name];
     return { ...t, label: (s && s.label) || t.name };
   });
+  // Token TOP 5 (all-time) — only populated when tracking is on.
+  weekly.topByTokens = trackTokens
+    ? tokenUsage.topByTokens(5).map((row) => {
+        const s = skillByName[row.name];
+        return { ...row, label: (s && s.label) || row.name };
+      })
+    : [];
 
   const pixelUriFor = (name) => {
     const file = PIXEL_MANIFEST[name];
@@ -464,6 +495,8 @@ function renderHtml(webview, skills) {
               data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
               data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
               data-count="${s.usage.count}"
+              data-tokens="${s.tokenStats ? s.tokenStats.total : 0}"
+              data-has-tokens="${s.tokenStats && s.tokenStats.total > 0 ? '1' : '0'}"
               data-last="${s.usage.lastUsed || ''}"
               data-level="${s.level}"
               data-plugin="${escapeHtml(s.plugin || '')}"
@@ -477,6 +510,7 @@ function renderHtml(webview, skills) {
               <div class="skill-name">${label}</div>
               ${aliased ? `<div class="skill-original">/${original}</div>` : ''}
               ${starsHtml}
+              ${s.tokenStats && s.tokenStats.total > 0 ? `<div class="skill-tokens" title="${escapeHtml(t('card.tokensTitle', { total: s.tokenStats.total.toLocaleString(), invocations: s.tokenStats.invocations, sessions: s.tokenStats.sessions }))}">${t('card.tokens', { tokens: tokenUsage.formatShort(s.tokenStats.total) })}</div>` : ''}
               <div class="hover-card">
                 <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
                 <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
@@ -538,6 +572,8 @@ function renderHtml(webview, skills) {
         data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
         data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
         data-count="${s.usage.count}"
+        data-tokens="${s.tokenStats ? s.tokenStats.total : 0}"
+        data-has-tokens="${s.tokenStats && s.tokenStats.total > 0 ? '1' : '0'}"
         data-last="${s.usage.lastUsed || ''}"
         data-level="${s.level}">
         ${kindBadge}
@@ -547,6 +583,7 @@ function renderHtml(webview, skills) {
         ${iconHtml}
         <div class="skill-name">${label}</div>
         ${s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>'}
+        ${s.tokenStats && s.tokenStats.total > 0 ? `<div class="skill-tokens" title="${escapeHtml(t('card.tokensTitle', { total: s.tokenStats.total.toLocaleString(), invocations: s.tokenStats.invocations, sessions: s.tokenStats.sessions }))}">${t('card.tokens', { tokens: tokenUsage.formatShort(s.tokenStats.total) })}</div>` : ''}
         <div class="hover-card">
           <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
           <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
@@ -555,6 +592,60 @@ function renderHtml(webview, skills) {
         </div>
       </button>`;
   };
+  // Buddy yard — pixel garden above Quick Bar where every class the user has
+  // ever invoked lives. Wide panels (≥400px) show it inline; narrow panels
+  // collapse to a "View buddies" button that opens a modal version.
+  const yardBuddies = userConfig.BUDDY_CLASSES
+    .map((c) => ({
+      ...c,
+      count: (character.skillStats && character.skillStats[c.id]) || 0,
+    }))
+    .filter((b) => b.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const yardSpriteUri = (cls) => {
+    if (!PIXEL_DIR) return null;
+    const abs = path.join(PIXEL_DIR, 'buddy', 'class', `${cls}.png`);
+    if (!fs.existsSync(abs)) return null;
+    return webview.asWebviewUri(vscode.Uri.file(abs)).toString();
+  };
+  const yardBuddyImgs = (extraClass) => yardBuddies.length
+    ? yardBuddies.map((b, i) => {
+        const uri = yardSpriteUri(b.id);
+        if (!uri) return '';
+        const role = t('class.' + b.id + '.role');
+        const name = t('class.' + b.id + '.name');
+        return `<img class="yard-buddy${extraClass ? ' ' + extraClass : ''}"
+          src="${uri}"
+          alt="${escapeHtml(name)}"
+          data-class="${escapeHtml(b.id)}"
+          title="${escapeHtml(name + ' — ' + role + ' · ' + b.count)}"
+          style="--idx: ${i}; --total: ${yardBuddies.length}; --delay: ${(i * 0.27).toFixed(2)}s;" />`;
+      }).join('')
+    : `<div class="yard-empty">${t('buddy.yard.empty')}</div>`;
+
+  const buddyYardHtml = `
+    <div class="buddy-yard-wrap">
+      <div class="buddy-yard" id="buddy-yard" title="${t('buddy.yard.title')}">
+        ${yardBuddyImgs()}
+      </div>
+      <button class="buddy-yard-btn" id="buddy-yard-btn" type="button">${t('buddy.yard.viewBtn')}</button>
+    </div>`;
+
+  // Modal version — same yard rendered larger, opened by the "View buddies"
+  // button on narrow panels. Always emitted; CSS controls visibility.
+  const buddyYardModalHtml = `
+    <div class="modal-bg" id="buddy-yard-modal-bg">
+      <div class="modal modal-wide buddy-yard-modal">
+        <h4>${t('buddy.yard.title')}</h4>
+        <div class="buddy-yard buddy-yard-modal-inner">
+          ${yardBuddyImgs('big')}
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="buddy-yard-modal-close">${t('modal.edit.cancel')}</button>
+        </div>
+      </div>
+    </div>`;
+
   // Slot i unlocked when character.stage >= i (slot 0 always unlocked)
   const unlockedSlots = Math.max(1, character.stage + 1);
   const quickbarHtml = `
@@ -1019,6 +1110,110 @@ function renderHtml(webview, skills) {
   .stars.lv3 { color: var(--accent); }
   .stars.lv4 { color: var(--magenta); }
   .stars.lv5 { color: var(--accent-2); }
+  /* Token usage label — accumulated total tokens for this skill across
+     ~/.claude/projects/*.jsonl. When token tracking is on, EVERY card
+     gets the same extra bottom padding so heights stay uniform across
+     the grid (prevents visible jitter when toggling modes). When tracking
+     is off, the v0.39 card layout is untouched. */
+  .skill-tokens {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 8px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+  }
+  body[data-tokens-on="1"] .skill { padding-bottom: 30px; }
+  body[data-tokens-on="1"] .skill .stars { bottom: 18px; }
+
+  /* Buddy yard — pixel diorama above the Quick Bar where every class the
+     user has ever invoked idles and walks. Inline on wide panels (≥400px),
+     collapses to a "View buddies" button + modal on narrow ones. */
+  .buddy-yard-wrap {
+    container-type: inline-size;
+    margin: 6px 0 10px;
+    text-align: center;
+  }
+  .buddy-yard {
+    position: relative;
+    min-width: 400px;
+    max-width: 600px;
+    height: 86px;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 2px solid var(--frame);
+    background:
+      radial-gradient(circle at 12% 78%, rgba(34,197,94,0.35) 1.5px, transparent 2px) 0 0/22px 22px,
+      radial-gradient(circle at 60% 84%, rgba(34,197,94,0.25) 1.5px, transparent 2px) 8px 4px/26px 26px,
+      linear-gradient(to bottom,
+        var(--bg) 0%,
+        rgba(99,102,241,0.18) 35%,
+        rgba(132,90,52,0.55) 62%,
+        rgba(91,62,38,0.85) 100%);
+    cursor: default;
+    image-rendering: pixelated;
+  }
+  .yard-buddy {
+    position: absolute;
+    bottom: 6px;
+    width: 28px;
+    height: 28px;
+    image-rendering: pixelated;
+    transform-origin: 50% 100%;
+    cursor: pointer;
+    /* Spread evenly across width: idx of total */
+    left: calc(((var(--idx) + 1) / (var(--total) + 1)) * 100% - 14px);
+    animation: yard-walk 2.6s ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+    transition: filter 0.12s;
+  }
+  .yard-buddy:hover { filter: drop-shadow(0 0 4px var(--accent)); }
+  .yard-buddy.big { width: 48px; height: 48px; bottom: 12px; }
+  @keyframes yard-walk {
+    0%, 100% { transform: translateX(-10px); }
+    49%      { transform: translateX(10px); }
+    50%      { transform: translateX(10px) scaleX(-1); }
+    99%      { transform: translateX(-10px) scaleX(-1); }
+  }
+  .yard-empty {
+    text-align: center;
+    padding: 32px 12px;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.4px;
+  }
+  .buddy-yard-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: var(--frame-strong);
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    letter-spacing: 0.4px;
+  }
+  .buddy-yard-btn:hover { background: var(--accent); color: var(--bg); }
+  /* Narrow panel: hide inline yard, show button instead */
+  @container (max-width: 419px) {
+    .buddy-yard { display: none; }
+    .buddy-yard-btn { display: inline-flex; }
+  }
+  .buddy-yard-modal-inner {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    height: 200px;
+    margin: 4px 0 12px;
+  }
+
   .lv-badge {
     position: absolute;
     top: 4px;
@@ -2136,7 +2331,7 @@ function renderHtml(webview, skills) {
   .empty { color: var(--muted); text-align: center; padding: 24px; }
 </style>
 </head>
-<body data-theme="${theme}">
+<body data-theme="${theme}" data-tokens-on="${trackTokens ? '1' : '0'}">
   ${(!cfg.meta || !cfg.meta.telemetry) ? `
   <div class="tlm-banner" id="tlm-banner">
     <span class="tlm-banner-text">${t('telemetry.banner')}</span>
@@ -2154,6 +2349,7 @@ function renderHtml(webview, skills) {
         <button class="sort-btn active" data-sort="default" title="${t('toolbar.sortDefault')}">☷</button>
         <button class="sort-btn" data-sort="recent" title="${t('toolbar.sortRecent')}">⏱</button>
         <button class="sort-btn" data-sort="usage" title="${t('toolbar.sortUsage')}">★</button>
+        ${trackTokens ? `<button class="sort-btn" data-sort="tokens" title="${t('toolbar.sortTokens')}">⚡</button>` : ''}
       </div>
       <button class="meta-btn" id="achv-btn" title="${t('toolbar.achievements')}">🏆</button>
       <button class="meta-btn" id="report-btn" title="${t('toolbar.weeklyReport')}">📊</button>
@@ -2167,7 +2363,7 @@ function renderHtml(webview, skills) {
       <button class="locale-toggle" id="locale-toggle" title="${t('toolbar.locale')}">🌐 ${locale.toUpperCase()}</button>
     </div>
   </div>
-  <div id="content">${skills.length ? `<div class="tpl-mode-banner" id="tpl-mode-banner">💬 ${t('panel.tplBannerHint')}</div>` : ''}${(skills.length ? quickbarHtml + recentSection + sections + hiddenSection : '') || `
+  <div id="content">${skills.length ? `<div class="tpl-mode-banner" id="tpl-mode-banner">💬 ${t('panel.tplBannerHint')}</div>` : ''}${skills.length ? buddyYardHtml : ''}${(skills.length ? quickbarHtml + recentSection + sections + hiddenSection : '') || `
     <section class="onboarding">
       <h3 class="onboarding-title">${t('onboarding.title')}</h3>
       <p class="onboarding-sub">${t('onboarding.sub')}</p>
@@ -2262,6 +2458,19 @@ function renderHtml(webview, skills) {
     </div>
   </div>
 
+  <div class="modal-bg" id="confirm-modal-bg" style="z-index: 300;">
+    <div class="modal">
+      <h4 id="confirm-modal-title"></h4>
+      <div id="confirm-modal-body" style="font-size:11px; line-height:1.5; color:var(--fg); margin-bottom:12px; white-space:pre-wrap;"></div>
+      <div class="modal-actions">
+        <button class="btn" id="confirm-modal-cancel">${t('modal.edit.cancel')}</button>
+        <button class="btn btn-danger" id="confirm-modal-ok"></button>
+      </div>
+    </div>
+  </div>
+
+  ${buddyYardModalHtml}
+
   <div class="modal-bg" id="groups-bg">
     <div class="modal">
       <h4>${t('modal.groups.title')}</h4>
@@ -2332,6 +2541,15 @@ function renderHtml(webview, skills) {
           <button class="btn" data-telemetry="off" id="tlm-off">${t('modal.settings.telemetryOff')}</button>
         </div>
         <div class="hint" id="tlm-status" style="margin-top:4px;"></div>
+      </div>
+      <div class="settings-section">
+        <label>${t('modal.settings.tokens')}</label>
+        <div class="hint">${t('modal.settings.tokensHint')}</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" data-tokens="on" id="tok-on">${t('modal.settings.tokensOn')}</button>
+          <button class="btn" data-tokens="off" id="tok-off">${t('modal.settings.tokensOff')}</button>
+        </div>
+        <div class="hint" id="tok-status" style="margin-top:4px;">${t('modal.settings.tokensCurrent', { value: trackTokens ? t('modal.settings.tokensOn') : t('modal.settings.tokensOff') })}</div>
       </div>
       <div class="modal-actions">
         <button class="btn" id="settings-close">${t('modal.settings.close')}</button>
@@ -2486,6 +2704,20 @@ function renderHtml(webview, skills) {
           `).join('')}
         </ol>
       </div>` : `<div class="report-empty">${t('modal.report.empty')}</div>`}
+      ${trackTokens ? `
+      <div class="report-section">
+        <div class="report-title">${t('modal.report.topTokens')}</div>
+        ${weekly.topByTokens.length ? `
+        <ol class="top-skills">
+          ${weekly.topByTokens.map((row, i) => `
+            <li>
+              <span class="rank">#${i + 1}</span>
+              <span class="top-name">${escapeHtml(row.label)}</span>
+              <span class="top-count">${t('modal.report.tokensRow', { tokens: tokenUsage.formatShort(row.total), invocations: row.invocations })}</span>
+            </li>
+          `).join('')}
+        </ol>` : `<div class="report-empty">${t('modal.report.tokensEmpty')}</div>`}
+      </div>` : ''}
       <textarea id="report-md" class="report-md-hidden" readonly>${escapeHtml(buildWeeklyMarkdown(weekly))}</textarea>
       <div class="modal-actions">
         <button class="btn" id="report-copy-md">${t('modal.report.copyMd')}</button>
@@ -2658,6 +2890,29 @@ reportBg.addEventListener('click', (e) => { if (e.target === reportBg) reportBg.
 buddyBg.addEventListener('click', (e) => { if (e.target === buddyBg) buddyBg.classList.remove('show'); });
 if (groupsBg) groupsBg.addEventListener('click', (e) => { if (e.target === groupsBg) groupsBg.classList.remove('show'); });
 
+// Buddy yard — narrow-panel button opens a modal version of the yard;
+// any yard buddy click opens the character sheet (existing buddy-bg modal).
+const buddyYardBtnEl = document.getElementById('buddy-yard-btn');
+const buddyYardModalBg = document.getElementById('buddy-yard-modal-bg');
+if (buddyYardBtnEl && buddyYardModalBg) {
+  buddyYardBtnEl.addEventListener('click', () => {
+    buddyYardModalBg.classList.add('show');
+    sfxOpen();
+  });
+  buddyYardModalBg.addEventListener('click', (e) => {
+    if (e.target === buddyYardModalBg) buddyYardModalBg.classList.remove('show');
+  });
+  const closeBtn = document.getElementById('buddy-yard-modal-close');
+  if (closeBtn) closeBtn.addEventListener('click', () => buddyYardModalBg.classList.remove('show'));
+}
+document.querySelectorAll('.yard-buddy').forEach((b) => {
+  b.addEventListener('click', () => {
+    if (buddyYardModalBg) buddyYardModalBg.classList.remove('show');
+    buddyBg.classList.add('show');
+    sfxOpen();
+  });
+});
+
 // Group management interactions
 (function wireGroups() {
   const list = document.getElementById('groups-list');
@@ -2698,9 +2953,12 @@ if (groupsBg) groupsBg.addEventListener('click', (e) => { if (e.target === group
     emojiInput.addEventListener('blur', persistRename);
     nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') persistRename(); });
     row.querySelector('.group-del').addEventListener('click', () => {
-      if (confirm(nameInput.value + ' — ' + STR['modal.groups.confirmDel'])) {
-        vscode.postMessage({ type: 'removeGroup', id });
-      }
+      showConfirm(
+        nameInput.value || (STR['modal.groups.delete'] || 'Delete'),
+        STR['modal.groups.confirmDel'],
+        STR['modal.groups.delete'] || 'Delete',
+        () => { vscode.postMessage({ type: 'removeGroup', id }); }
+      );
     });
     const upBtn = row.querySelector('.group-up');
     const downBtn = row.querySelector('.group-down');
@@ -2772,9 +3030,12 @@ document.getElementById('buddy-save-name').addEventListener('click', () => {
 });
 const reincarnateBtn = document.getElementById('buddy-reincarnate');
 if (reincarnateBtn) reincarnateBtn.addEventListener('click', () => {
-  if (!confirm(t('modal.buddy.reincarnateConfirm'))) return;
-  vscode.postMessage({ type: 'reincarnate' });
-  sfxClick();
+  showConfirm(
+    t('modal.buddy.reincarnate'),
+    t('modal.buddy.reincarnateConfirm'),
+    t('modal.buddy.reincarnate'),
+    () => { vscode.postMessage({ type: 'reincarnate' }); sfxClick(); }
+  );
 });
 const modalBg = document.getElementById('modal-bg');
 const mAlias = document.getElementById('m-alias');
@@ -2978,6 +3239,32 @@ promptModalText.addEventListener('keydown', (e) => {
   }
 });
 
+// Generic confirm modal — replaces window.confirm() which is silently
+// blocked in VS Code/Cursor webviews. Used by Reincarnate, group delete,
+// settings import — anywhere that needs a yes/no gate.
+const confirmModalBg = document.getElementById('confirm-modal-bg');
+const confirmModalTitle = document.getElementById('confirm-modal-title');
+const confirmModalBody = document.getElementById('confirm-modal-body');
+const confirmModalOk = document.getElementById('confirm-modal-ok');
+let pendingConfirm = null;
+function showConfirm(title, body, okLabel, onOk) {
+  confirmModalTitle.textContent = title;
+  confirmModalBody.textContent = body;
+  confirmModalOk.textContent = okLabel;
+  pendingConfirm = onOk;
+  confirmModalBg.classList.add('show');
+  setTimeout(() => confirmModalOk.focus(), 50);
+}
+function closeConfirm() { confirmModalBg.classList.remove('show'); pendingConfirm = null; }
+document.getElementById('confirm-modal-cancel').addEventListener('click', closeConfirm);
+confirmModalOk.addEventListener('click', () => {
+  const cb = pendingConfirm;
+  closeConfirm();
+  if (cb) cb();
+});
+confirmModalBg.addEventListener('click', (e) => { if (e.target === confirmModalBg) closeConfirm(); });
+confirmModalOk.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeConfirm(); });
+
 document.getElementById('m-save').addEventListener('click', () => {
   if (!editingSkill) return;
   vscode.postMessage({
@@ -3142,6 +3429,9 @@ function applySort() {
       }
       if (mode === 'usage') {
         return parseInt(b.dataset.count || '0', 10) - parseInt(a.dataset.count || '0', 10);
+      }
+      if (mode === 'tokens') {
+        return parseInt(b.dataset.tokens || '0', 10) - parseInt(a.dataset.tokens || '0', 10);
       }
       return a.dataset.name.localeCompare(b.dataset.name);
     });
@@ -3555,9 +3845,12 @@ const settingsImportText = document.getElementById('settings-import-text');
 if (settingsImportBtn) settingsImportBtn.addEventListener('click', () => {
   const json = (settingsImportText.value || '').trim();
   if (!json) return;
-  if (!confirm(t('modal.settings.importConfirm'))) return;
-  vscode.postMessage({ type: 'importSettings', json });
-  sfxClick();
+  showConfirm(
+    t('modal.settings.import'),
+    t('modal.settings.importConfirm'),
+    t('modal.settings.importBtn'),
+    () => { vscode.postMessage({ type: 'importSettings', json }); sfxClick(); }
+  );
 });
 function refreshTlmStatus() {
   const el = document.getElementById('tlm-status');
@@ -3567,6 +3860,12 @@ const tlmOn2 = document.getElementById('tlm-on');
 const tlmOff2 = document.getElementById('tlm-off');
 if (tlmOn2) tlmOn2.addEventListener('click', () => { setTelemetry('on'); window.__telemetry = 'on'; refreshTlmStatus(); });
 if (tlmOff2) tlmOff2.addEventListener('click', () => { setTelemetry('off'); window.__telemetry = 'off'; refreshTlmStatus(); });
+
+const tokOn = document.getElementById('tok-on');
+const tokOff = document.getElementById('tok-off');
+function setTokens(value) { vscode.postMessage({ type: 'setTokens', value }); sfxClick(); }
+if (tokOn) tokOn.addEventListener('click', () => setTokens('on'));
+if (tokOff) tokOff.addEventListener('click', () => setTokens('off'));
 
 // Footer external links (asWebviewUri/CSP can be picky; route through host)
 const footerRate = document.getElementById('footer-rate');
@@ -3685,6 +3984,17 @@ class SkillsViewProvider {
         cfg.meta.telemetry = msg.value;
         userConfig.write(cfg);
         this.refresh();
+      } else if (msg.type === 'setTokens' && (msg.value === 'on' || msg.value === 'off')) {
+        const cfg = userConfig.read();
+        if (!cfg.meta) cfg.meta = {};
+        cfg.meta.trackTokens = msg.value === 'on';
+        userConfig.write(cfg);
+        if (msg.value === 'on') startTokenTracking();
+        else stopTokenTracking();
+        this.refresh();
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'toast', key: msg.value === 'on' ? 'toast.tokensEnabled' : 'toast.tokensDisabled' });
+        }
       } else if (msg.type === 'runRawCommand' && typeof msg.command === 'string') {
         // Dispatched by onboarding "install superpowers" button.
         // Routes the literal slash command to clipboard or active terminal.
@@ -3833,6 +4143,7 @@ class SkillsViewProvider {
 
 function activate(context) {
   loadPixelManifest(context.extensionPath);
+  startTokenTracking();
   const provider = new SkillsViewProvider(context);
 
   context.subscriptions.push(
@@ -3902,6 +4213,8 @@ function activate(context) {
   //  Use the refresh command or panel toolbar refresh after manual edits.)
 }
 
-function deactivate() {}
+function deactivate() {
+  stopTokenTracking();
+}
 
 module.exports = { activate, deactivate };

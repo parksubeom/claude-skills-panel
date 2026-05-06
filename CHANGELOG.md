@@ -2,6 +2,78 @@
 
 All notable changes to this extension are documented here.
 
+## [0.40.0] — 2026-05-06
+
+### Added — Per-skill token usage tracking (opt-in)
+
+You can now see how many tokens each slash command has actually consumed
+across all your Claude Code sessions. Settings → "Track skill token usage"
+→ Enable, then every card grows a small line under its mastery stars
+(`12.4k tok`), the toolbar gains a `⚡ Most tokens` sort option, and the
+weekly report adds a "Top 5 by Tokens (all-time)" section.
+
+How it works (and what it does NOT read):
+
+- The panel scans `~/.claude/projects/<cwd-slug>/<sessionId>.jsonl`
+  incrementally — these are the per-session transcripts Claude Code
+  itself writes. Append-only, so the panel just reads new bytes since
+  the last scan and re-uses byte offsets.
+- Inside each line we ONLY look at: `type`, `message.usage`
+  (`input_tokens` / `output_tokens` / `cache_creation_input_tokens` /
+  `cache_read_input_tokens`), `promptId` / `parentUuid` (linkage), and
+  `timestamp`. We never read prompt text, tool results, or any of your
+  message content.
+- A `<command-name>/skillname</command-name>` marker on a user line
+  binds that line's `promptId` to a slash command; subsequent assistant
+  lines with the same `promptId` get their usage attributed to that
+  command.
+- All data stays in memory on this machine — no persistence, no upload.
+- Default OFF. Initial scan happens on enable; rescans every 30s.
+
+Caveats: the `.jsonl` shape is undocumented (observed on Claude Code
+v2.1.126). If Anthropic restructures it, the parser fails open (no
+panic, just empty stats) until we adapt.
+
+### Added — Buddy Yard above the Quick Bar
+
+The empty header strip above the Quick Bar is now a pixel diorama
+where every class your buddy has ever invoked idles and walks back
+and forth. Sky-to-grass gradient, dots-of-grass texture, ~28px sprites
+at the bottom, each with a staggered idle-walk animation (left ↔ right,
+2.6s cycle, 270ms stagger between buddies). Only classes with
+`character.skillStats[id] > 0` show up — the yard reflects your
+actual usage pattern, not a static cast list.
+
+- **Wide panels (≥420px)** → inline yard, capped at 600px wide,
+  centered.
+- **Narrow panels (Activity Bar)** → yard collapses to a `🐾 View
+  buddies` button; clicking opens a modal version of the yard at
+  larger sprite size.
+- Click any buddy → opens the existing character sheet.
+- Empty state if no skills used yet ("invoke a few skills and they'll
+  show up here").
+
+i18n: 3 new keys × 4 locales (`buddy.yard.*`).
+
+### Fixed — Confirm dialogs replaced with custom pixel modal
+
+VS Code/Cursor webviews silently block `window.confirm()` — clicking
+🔄 Reincarnate, deleting a custom group, or pressing Import in
+Settings would do nothing because the gating dialog never appeared.
+v0.40 ships a custom confirm modal (same pixel styling as the prompt
+modal) gated above other modals via a higher z-index, so all three
+flows now actually run.
+
+### Fixed — Card layout drift when toggling token tracking
+
+Token tracking added a label line under the mastery stars, which
+needed extra card padding. v0.39's first cut shifted stars on every
+card (including those with no token data), causing long-name cards
+("bump-and-publish") to overlap their stars. v0.40 gates the padding
+behind `body[data-tokens-on="1"]` so the layout only changes when
+tracking is on, and applies it uniformly to every card so heights
+stay consistent across the grid.
+
 ## [0.39.0] — 2026-05-06
 
 ### Added — Edit prompts before sending in terminal mode
