@@ -33,7 +33,6 @@
   "execute-plan": "spark/executing-plans.png",
   "write-plan": "spark/writing-plans.png",
   "brainstorm": "spark/brainstorming.png",
-  "execute-plans": "spark/executing-plans.png",
   "search": "spark/search.png",
   "settings": "spark/settings.png",
   "terminal": "spark/terminal.png",
@@ -65,5 +64,6 @@
   "magic": "spark/magic.png",
   "plus": "spark/plus.png",
   "check": "spark/check.png",
-  "cross": "spark/cross.png"
+  "cross": "spark/cross.png",
+  "execute-plans": "spark/executing-plans.png"
 }

@@ -7,74 +7,16 @@ const userConfig = require('./userConfig');
 const achievements = require('./achievements');
 const i18n = require('./i18n/strings');
 
-// OS-level paste keystroke. Cmd+V (macOS) / Ctrl+V (Windows / Linux).
-// Optionally follows with Enter for fully autonomous send.
-//   - macOS: uses osascript (System Events)   → needs Accessibility permission
-//   - Windows: uses PowerShell SendKeys       → no permission prompt
-//   - Linux: uses xdotool if available        → must install xdotool
-function osKeystroke(withEnter) {
-  const cp = require('child_process');
-  if (process.platform === 'darwin') {
-    const script = withEnter
-      ? `tell application "System Events" to keystroke "v" using command down
-         delay 0.06
-         tell application "System Events" to keystroke return`
-      : `tell application "System Events" to keystroke "v" using command down`;
-    try {
-      cp.execFile('osascript', ['-e', script], { timeout: 2000 }, () => {});
-      return true;
-    } catch { return false; }
-  }
-  if (process.platform === 'win32') {
-    const cmd = withEnter
-      ? "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v'); Start-Sleep -Milliseconds 60; [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')"
-      : "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')";
-    try {
-      cp.execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', cmd], { timeout: 3000 }, () => {});
-      return true;
-    } catch { return false; }
-  }
-  if (process.platform === 'linux') {
-    // xdotool: not preinstalled on most distros — installs via apt/dnf/pacman
-    try {
-      cp.execFile('xdotool', ['key', 'ctrl+v'], { timeout: 1500 }, () => {});
-      if (withEnter) {
-        setTimeout(() => {
-          try { cp.execFile('xdotool', ['key', 'Return'], { timeout: 1500 }, () => {}); } catch {}
-        }, 60);
-      }
-      return true;
-    } catch { return false; }
-  }
-  return false;
-}
-
-async function tryFocus() {
-  const cmds = await vscode.commands.getCommands(true);
-  const focusCmd = cmds.find((c) => c === 'claude-vscode.focus' || c === 'claude-code.focus');
-  if (!focusCmd) return false;
-  try {
-    await vscode.commands.executeCommand(focusCmd);
-    await new Promise((r) => setTimeout(r, 120));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // Dispatch slash skill execution.
 //   paste    → clipboard only (caller already wrote) — user pastes manually
-//   auto     → focus + OS keystroke Cmd/Ctrl+V + Enter (fully autonomous)
-//   terminal → send to active terminal with newline
+//   terminal → send to active terminal with newline (or create one if absent)
+// (The previous "auto" mode used osascript / SendKeys / xdotool to paste-and-Enter
+//  into the focused window. It was unreliable against the Claude Code extension's
+//  React-driven input, so it was removed in v0.39 in favor of the always-reliable
+//  paste + terminal pair.)
 async function dispatchExec(name, mode) {
   if (!mode || mode === 'paste' || mode === 'off') return;
   const text = '/' + name;
-  if (mode === 'auto') {
-    await tryFocus();
-    await new Promise((r) => setTimeout(r, 60));
-    osKeystroke(true);
-    return;
-  }
   if (mode === 'terminal') {
     let term = vscode.window.activeTerminal;
     if (!term) {
@@ -517,6 +459,7 @@ function renderHtml(webview, skills) {
               data-file="${escapeHtml(s.file)}"
               data-alias="${escapeHtml(s.label)}"
               data-note="${escapeHtml(s.note)}"
+              data-prompt-template="${escapeHtml(s.promptTemplate || '')}"
               data-hidden="${s.hidden ? '1' : '0'}"
               data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
               data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
@@ -528,6 +471,7 @@ function renderHtml(webview, skills) {
               data-group="${escapeHtml(s.customGroup || '')}">
               ${kindBadge}
               ${lvBadge}
+              <span class="prompt-btn" title="${t('card.promptBtnTitle')}">💬</span>
               <span class="edit-btn" title="${t('card.edit')}">✎</span>
               ${iconHtml}
               <div class="skill-name">${label}</div>
@@ -589,6 +533,7 @@ function renderHtml(webview, skills) {
         data-file="${escapeHtml(s.file)}"
         data-alias="${escapeHtml(s.label)}"
         data-note="${escapeHtml(s.note)}"
+        data-prompt-template="${escapeHtml(s.promptTemplate || '')}"
         data-hidden="0"
         data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
         data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
@@ -597,6 +542,7 @@ function renderHtml(webview, skills) {
         data-level="${s.level}">
         ${kindBadge}
         ${lvBadge}
+        <span class="prompt-btn" title="${t('card.promptBtnTitle')}">💬</span>
         <span class="edit-btn" title="${t('card.edit')}">✎</span>
         ${iconHtml}
         <div class="skill-name">${label}</div>
@@ -1092,6 +1038,24 @@ function renderHtml(webview, skills) {
   .lv-badge.lv3 { color: var(--accent); border-color: var(--accent); }
   .lv-badge.lv4 { color: var(--magenta); border-color: var(--magenta); }
   .lv-badge.lv5 { color: var(--accent-2); border-color: var(--accent-2); box-shadow: 0 0 6px var(--accent-2); }
+
+  /* Prompt-template mode banner — only visible in terminal/auto modes,
+     letting any user (even those without saved templates yet) know they
+     can edit the prompt before it gets sent. */
+  .tpl-mode-banner {
+    display: none;
+    margin: 6px 0 4px;
+    padding: 6px 10px;
+    border: 1px solid var(--accent);
+    background: var(--frame-strong);
+    color: var(--accent);
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    line-height: 1.4;
+    box-shadow: inset 0 0 0 1px var(--bg);
+  }
+  body[data-tpl-active="1"] .tpl-mode-banner { display: block; }
+
   .sort-group { display: flex; gap: 2px; }
   .sort-btn {
     all: unset;
@@ -1620,6 +1584,34 @@ function renderHtml(webview, skills) {
     color: #1a1f2c;
     border-color: #c2410c;
     opacity: 1 !important;
+  }
+
+  /* Prompt-edit button — appears on each card only when exec mode is
+     terminal/auto. Click opens the pre-send edit modal. Stays visible
+     even without hover so users discover the affordance immediately. */
+  .prompt-btn {
+    display: none;
+    position: absolute;
+    top: 4px;
+    right: 26px;
+    width: 18px;
+    height: 18px;
+    line-height: 14px;
+    text-align: center;
+    background: rgba(11, 13, 18, 0.6);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.12s, box-shadow 0.12s;
+    z-index: 6;
+  }
+  body[data-tpl-active="1"] .prompt-btn { display: inline-block; }
+  .prompt-btn:hover {
+    background: var(--accent);
+    color: #1a1f2c;
+    box-shadow: 0 0 6px var(--accent);
   }
 
   /* Hover popover */
@@ -2175,7 +2167,7 @@ function renderHtml(webview, skills) {
       <button class="locale-toggle" id="locale-toggle" title="${t('toolbar.locale')}">🌐 ${locale.toUpperCase()}</button>
     </div>
   </div>
-  <div id="content">${(skills.length ? quickbarHtml + recentSection + sections + hiddenSection : '') || `
+  <div id="content">${skills.length ? `<div class="tpl-mode-banner" id="tpl-mode-banner">💬 ${t('panel.tplBannerHint')}</div>` : ''}${(skills.length ? quickbarHtml + recentSection + sections + hiddenSection : '') || `
     <section class="onboarding">
       <h3 class="onboarding-title">${t('onboarding.title')}</h3>
       <p class="onboarding-sub">${t('onboarding.sub')}</p>
@@ -2225,6 +2217,9 @@ function renderHtml(webview, skills) {
       <input type="text" id="m-alias" placeholder="${t('modal.edit.aliasPh')}" />
       <label>${t('modal.edit.note')}</label>
       <textarea id="m-note" placeholder="${t('modal.edit.notePh')}"></textarea>
+      <label>${t('modal.edit.promptTemplate')}</label>
+      <textarea id="m-prompt-template" placeholder="${t('modal.edit.promptTemplatePh')}"></textarea>
+      <div class="hint" style="margin-top:-4px;">${t('modal.edit.promptTemplateHint')}</div>
       <label>${t('modal.edit.icon')}</label>
       <div class="icon-row">
         <div class="icon-preview" id="m-icon-preview">
@@ -2252,6 +2247,17 @@ function renderHtml(webview, skills) {
         <button class="btn btn-danger" id="m-reset">${t('modal.edit.reset')}</button>
         <button class="btn" id="m-cancel">${t('modal.edit.cancel')}</button>
         <button class="btn btn-primary" id="m-save">${t('modal.edit.save')}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="prompt-modal-bg">
+    <div class="modal">
+      <h4 id="prompt-modal-title">${t('modal.prompt.titleFormat', { name: '' })}</h4>
+      <textarea id="prompt-modal-text" placeholder="${t('modal.prompt.placeholder')}" style="min-height:120px;"></textarea>
+      <div class="modal-actions">
+        <button class="btn" id="prompt-modal-cancel">${t('modal.prompt.cancel')}</button>
+        <button class="btn btn-primary" id="prompt-modal-send">${t('modal.prompt.send')}</button>
       </div>
     </div>
   </div>
@@ -2581,23 +2587,30 @@ scanlinesBtn.addEventListener('click', () => {
   saveState();
 });
 
-// Exec mode cycle: paste → auto → terminal → paste
-const EXEC_MODES = ['paste', 'auto', 'terminal'];
-const EXEC_LABELS = { paste: '▶ Paste', auto: '▶ Auto', terminal: '▶ Term' };
+// Exec mode cycle: paste → terminal → paste
+// (auto mode was removed in v0.39 — see dispatchExec comment in host.)
+const EXEC_MODES = ['paste', 'terminal'];
+// 💬 in the terminal label signals "prompt is editable before send"
+// — terminal auto-fires through sendText, so the panel offers a pre-send edit modal.
+const EXEC_LABELS = { paste: '▶ Paste', terminal: '▶💬 Term' };
 const EXEC_NEXT_HINT = {
   paste: t('exec.paste'),
-  auto: t('exec.auto'),
   terminal: t('exec.terminal'),
 };
 const execBtn = document.getElementById('exec-mode-btn');
 function applyExecMode() {
-  const m = STATE.execMode || 'off';
+  let m = STATE.execMode || 'paste';
+  // Migrate legacy 'auto' setting from earlier versions to 'paste'
+  if (m === 'auto' || m === 'off') { m = 'paste'; STATE.execMode = m; saveState(); }
   execBtn.textContent = EXEC_LABELS[m];
   execBtn.classList.remove('mode-paste', 'mode-terminal');
-  if (m !== 'off') execBtn.classList.add('mode-' + m);
+  execBtn.classList.add('mode-' + m);
   execBtn.title = t('exec.modeTitle', { hint: EXEC_NEXT_HINT[m] });
+  // Terminal auto-fires through sendText — light up the per-card prompt
+  // edit buttons so users can intervene before send.
+  document.body.dataset.tplActive = (m === 'terminal') ? '1' : '0';
 }
-if (!STATE.execMode || STATE.execMode === 'off') STATE.execMode = 'paste';
+if (!STATE.execMode || STATE.execMode === 'off' || STATE.execMode === 'auto') STATE.execMode = 'paste';
 applyExecMode();
 execBtn.addEventListener('click', () => {
   const cur = STATE.execMode || 'off';
@@ -2766,6 +2779,7 @@ if (reincarnateBtn) reincarnateBtn.addEventListener('click', () => {
 const modalBg = document.getElementById('modal-bg');
 const mAlias = document.getElementById('m-alias');
 const mNote = document.getElementById('m-note');
+const mPromptTemplate = document.getElementById('m-prompt-template');
 const mHidden = document.getElementById('m-hidden');
 const mTitle = document.getElementById('modal-title');
 const mGroup = document.getElementById('m-group');
@@ -2889,6 +2903,7 @@ function openEditModal(el) {
   mTitle.textContent = t('modal.edit.titleFormat', { name: editingSkill });
   mAlias.value = el.dataset.alias && el.dataset.alias !== editingSkill ? el.dataset.alias : '';
   mNote.value = el.dataset.note || '';
+  if (mPromptTemplate) mPromptTemplate.value = el.dataset.promptTemplate || '';
   mHidden.checked = el.dataset.hidden === '1';
   if (mGroup) mGroup.value = el.dataset.group || '';
   pendingIconClear = false;
@@ -2907,6 +2922,62 @@ function openEditModal(el) {
 function closeModal() { modalBg.classList.remove('show'); editingSkill = null; }
 modalBg.addEventListener('click', (e) => { if (e.target === modalBg) closeModal(); });
 document.getElementById('m-cancel').addEventListener('click', closeModal);
+
+// Prompt modal — opens when a skill has a saved promptTemplate, lets user
+// edit the final text before it's sent through the active execution mode.
+const promptModalBg = document.getElementById('prompt-modal-bg');
+const promptModalText = document.getElementById('prompt-modal-text');
+const promptModalTitle = document.getElementById('prompt-modal-title');
+let pendingPrompt = null; // { name, element, event }
+function openPromptModal(name, template, element, evt) {
+  pendingPrompt = { name, element, event: evt };
+  promptModalTitle.textContent = t('modal.prompt.titleFormat', { name });
+  // Substitution rules:
+  //   - "{cmd}" present → replace in place ("review {cmd} for X" → "review /name for X")
+  //   - "{cmd}" absent  → append " /name" at the end ("review this file" → "review this file /name")
+  // The second rule lets users skip the {cmd} concept and just type a prefix.
+  const tpl = (template || '');
+  const prefilled = /\{cmd\}/.test(tpl)
+    ? tpl.replace(/\{cmd\}/g, '/' + name)
+    : (tpl.trimEnd() + ' /' + name).trimStart();
+  promptModalText.value = prefilled;
+  promptModalBg.classList.add('show');
+  setTimeout(() => {
+    promptModalText.focus();
+    // Place caret at end so the user can immediately keep typing
+    const len = promptModalText.value.length;
+    promptModalText.setSelectionRange(len, len);
+  }, 50);
+}
+function closePromptModal() { promptModalBg.classList.remove('show'); pendingPrompt = null; }
+promptModalBg.addEventListener('click', (e) => { if (e.target === promptModalBg) closePromptModal(); });
+document.getElementById('prompt-modal-cancel').addEventListener('click', closePromptModal);
+document.getElementById('prompt-modal-send').addEventListener('click', () => {
+  if (!pendingPrompt) return;
+  const text = promptModalText.value;
+  const { name, element, event: evt } = pendingPrompt;
+  vscode.postMessage({ type: 'copyWithPrompt', name, text, execMode: STATE.execMode || 'off' });
+  sfxCopy();
+  if (element) {
+    element.classList.add('copied');
+    setTimeout(() => element.classList.remove('copied'), 600);
+    petToCard(element);
+    spawnRipple(element, evt);
+  }
+  const prefix = ({ paste: t('exec.prefixPaste'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
+  showToast('▶ ' + prefix + ': /' + name);
+  closePromptModal();
+});
+// Cmd/Ctrl+Enter shortcut to send from textarea
+promptModalText.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('prompt-modal-send').click();
+  } else if (e.key === 'Escape') {
+    closePromptModal();
+  }
+});
+
 document.getElementById('m-save').addEventListener('click', () => {
   if (!editingSkill) return;
   vscode.postMessage({
@@ -2914,6 +2985,7 @@ document.getElementById('m-save').addEventListener('click', () => {
     name: editingSkill,
     alias: mAlias.value.trim(),
     note: mNote.value.trim(),
+    promptTemplate: mPromptTemplate ? mPromptTemplate.value.trim() : '',
     hidden: mHidden.checked,
     clearIcon: pendingIconClear,
     sparkIcon: pendingSparkIcon,
@@ -2923,7 +2995,7 @@ document.getElementById('m-save').addEventListener('click', () => {
 });
 document.getElementById('m-reset').addEventListener('click', () => {
   if (!editingSkill) return;
-  vscode.postMessage({ type: 'saveConfig', name: editingSkill, alias: '', note: '', hidden: false, clearIcon: true });
+  vscode.postMessage({ type: 'saveConfig', name: editingSkill, alias: '', note: '', promptTemplate: '', hidden: false, clearIcon: true });
   closeModal();
 });
 document.getElementById('m-icon-upload').addEventListener('click', () => {
@@ -3090,7 +3162,7 @@ applySort();
 // ---- Quick Bar interactions ----
 function triggerSkill(name, file, opts) {
   vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
-  const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
+  const prefix = ({ paste: t('exec.prefixPaste'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
   showToast('▶ ' + prefix + ': /' + name);
   sfxCopy();
   if (opts && opts.element) {
@@ -3229,6 +3301,16 @@ document.querySelectorAll('.skill').forEach((el) => {
       openEditModal(el);
       return;
     }
+    if (e.target.classList.contains('prompt-btn')) {
+      e.stopPropagation();
+      sfxOpen();
+      const name = el.dataset.name;
+      const promptTemplate = el.dataset.promptTemplate || '';
+      openPromptModal(name, promptTemplate, el, e);
+      return;
+    }
+    // Main card click: always immediate fire through current exec mode.
+    // (Modal for editing is reached via the dedicated 💬 button above.)
     const name = el.dataset.name;
     vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
     el.classList.add('copied');
@@ -3236,7 +3318,7 @@ document.querySelectorAll('.skill').forEach((el) => {
     petToCard(el);
     spawnRipple(el, e);
     setTimeout(() => el.classList.remove('copied'), 600);
-    const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
+    const prefix = ({ paste: t('exec.prefixPaste'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
     showToast('▶ ' + prefix + ': /' + name);
   });
   el.addEventListener('contextmenu', (e) => {
@@ -3349,7 +3431,7 @@ search.addEventListener('keydown', (e) => {
       const name = slash.replace(/^\\//, '');
       vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
       sfxCopy();
-      const prefix = ({ paste: t('exec.prefixPaste'), auto: t('exec.prefixAuto'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
+      const prefix = ({ paste: t('exec.prefixPaste'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
       showToast('▶ ' + prefix + ': /' + name);
       return;
     }
@@ -3531,6 +3613,31 @@ class SkillsViewProvider {
         }
         clearTimeout(this._copyRefreshTimer);
         this._copyRefreshTimer = setTimeout(() => this.refresh(), 1200);
+      } else if (msg.type === 'copyWithPrompt' && msg.name && typeof msg.text === 'string') {
+        // User edited the final text in the prompt modal — send it as-is
+        // (do NOT rebuild from `/name`, since the template may wrap or
+        // reposition the slash command, e.g. "review {cmd} for X").
+        const finalText = msg.text;
+        const mode = msg.execMode || 'off';
+        await vscode.env.clipboard.writeText(finalText);
+        if (mode === 'terminal') {
+          let term = vscode.window.activeTerminal;
+          if (!term) {
+            const named = vscode.window.terminals.find((tt) => /claude/i.test(tt.name));
+            term = named || vscode.window.terminals[0];
+          }
+          if (!term) term = vscode.window.createTerminal('Claude');
+          term.show(true);
+          term.sendText(finalText, true);
+        }
+        // Usage still attributes to the underlying skill name
+        const result = userConfig.recordUsage(msg.name);
+        vscode.window.setStatusBarMessage('Sent: /' + msg.name, 2000);
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'usageRecorded', name: msg.name, ...result });
+        }
+        clearTimeout(this._copyRefreshTimer);
+        this._copyRefreshTimer = setTimeout(() => this.refresh(), 1200);
       } else if (msg.type === 'open' && msg.file) {
         const doc = await vscode.workspace.openTextDocument(msg.file);
         vscode.window.showTextDocument(doc);
@@ -3580,8 +3687,7 @@ class SkillsViewProvider {
         this.refresh();
       } else if (msg.type === 'runRawCommand' && typeof msg.command === 'string') {
         // Dispatched by onboarding "install superpowers" button.
-        // Routes the literal slash command to wherever the user's exec mode
-        // says: clipboard, auto-paste, or active terminal.
+        // Routes the literal slash command to clipboard or active terminal.
         const text = msg.command;
         await vscode.env.clipboard.writeText(text);
         const cfg = userConfig.read();
@@ -3595,10 +3701,6 @@ class SkillsViewProvider {
           if (!term) term = vscode.window.createTerminal('Claude');
           term.show(true);
           term.sendText(text, true);
-        } else if (mode === 'auto') {
-          await tryFocus();
-          await new Promise((r) => setTimeout(r, 80));
-          osKeystroke(true);
         }
         // For 'paste' mode, the clipboard write above is enough — user pastes manually.
       } else if (msg.type === 'copyWeeklyMarkdown' && typeof msg.markdown === 'string') {
@@ -3634,6 +3736,7 @@ class SkillsViewProvider {
         if (!cfg.skills[msg.name]) cfg.skills[msg.name] = {};
         if (msg.alias) cfg.skills[msg.name].alias = msg.alias; else delete cfg.skills[msg.name].alias;
         if (msg.note) cfg.skills[msg.name].note = msg.note; else delete cfg.skills[msg.name].note;
+        if (msg.promptTemplate) cfg.skills[msg.name].promptTemplate = msg.promptTemplate; else delete cfg.skills[msg.name].promptTemplate;
         if (msg.hidden) cfg.skills[msg.name].hidden = true; else delete cfg.skills[msg.name].hidden;
         if (msg.group !== undefined) {
           if (msg.group) cfg.skills[msg.name].group = msg.group;

@@ -18,6 +18,7 @@ const STRINGS = {
     'card.usage': 'Used {count}× · LV.{level}',
     'card.notUsed': 'Not used yet',
     'card.copyHint': 'Click → copy /{name}',
+    'card.promptBtnTitle': 'Edit prompt before sending',
 
     // Quick bar
     'quickbar.unlockHint': '({unlocked}/6 slots · evolve to unlock more)',
@@ -29,6 +30,7 @@ const STRINGS = {
 
     // Empty state
     'panel.empty': 'No skills found. Add SKILL.md under ~/.claude/skills.',
+    'panel.tplBannerHint': 'Each card now shows a 💬 button — tap it to edit the prompt before sending. Card body still fires immediately.',
 
     // Onboarding (shown when zero skills are discovered)
     'onboarding.title': 'Welcome — let\'s wire up your skills',
@@ -84,9 +86,18 @@ const STRINGS = {
     'modal.edit.group': 'Group',
     'modal.edit.groupAuto': 'Auto (by source)',
     'modal.edit.hide': 'Hide from panel',
+    'modal.edit.promptTemplate': 'Prompt template',
+    'modal.edit.promptTemplatePh': 'e.g. "review this file" or "Review {cmd} for security"',
+    'modal.edit.promptTemplateHint': 'Type a prefix and /skill appends at the end automatically. Use {cmd} to control its position. Empty = send directly.',
     'modal.edit.reset': 'Reset',
     'modal.edit.cancel': 'Cancel',
     'modal.edit.save': 'Save',
+
+    // Prompt modal — opens when a skill has a prompt template, lets user edit before sending
+    'modal.prompt.titleFormat': '/{name} — Edit & Send',
+    'modal.prompt.placeholder': 'Edit your prompt before sending…',
+    'modal.prompt.send': '▶ Send',
+    'modal.prompt.cancel': 'Cancel',
 
     // Achievements modal
     'modal.achv.title': '🏆 Achievements',
@@ -198,11 +209,9 @@ const STRINGS = {
 
     // Exec mode
     'exec.paste': 'Copy to clipboard',
-    'exec.auto': 'Auto-paste & send (mac/win/linux)',
     'exec.terminal': 'Run in terminal',
     'exec.modeTitle': 'Execution mode: {hint} (click to change)',
     'exec.prefixPaste': 'Copied',
-    'exec.prefixAuto': 'Sent',
     'exec.prefixTerminal': 'Terminal',
 
     // Toasts
@@ -273,6 +282,7 @@ const STRINGS = {
     'card.usage': '사용 {count}회 · LV.{level}',
     'card.notUsed': '아직 사용 안함',
     'card.copyHint': '클릭 → /{name} 복사',
+    'card.promptBtnTitle': '전송 전에 프롬프트 편집',
 
     'quickbar.unlockHint': '({unlocked}/6 해금 · 진화로 +1)',
     'quickbar.locked': '진화 {stage} 단계에서 해금',
@@ -281,6 +291,7 @@ const STRINGS = {
     'section.hidden': '숨김',
 
     'panel.empty': '스킬이 없습니다. ~/.claude/skills 에 SKILL.md 를 추가해보세요.',
+    'panel.tplBannerHint': '카드마다 💬 버튼이 표시됩니다 — 누르면 전송 전에 프롬프트를 편집할 수 있어요. 카드 본체 클릭은 그대로 즉시 발사.',
 
     'onboarding.title': '시작하기 — 스킬 패널 준비',
     'onboarding.sub': '이 패널은 머신에 있는 모든 Claude Code 슬래시 커맨드를 자동으로 찾아옵니다. 아래 중 하나로 시작하세요.',
@@ -332,9 +343,17 @@ const STRINGS = {
     'modal.edit.group': '그룹',
     'modal.edit.groupAuto': '자동 (소스 기반)',
     'modal.edit.hide': '패널에서 숨기기',
+    'modal.edit.promptTemplate': '프롬프트 템플릿',
+    'modal.edit.promptTemplatePh': '예: "이 파일 분석" 또는 "{cmd} 보안 관점에서 리뷰"',
+    'modal.edit.promptTemplateHint': '앞에 붙일 텍스트만 적으면 /스킬명이 끝에 자동으로 붙습니다. 위치를 직접 정하려면 {cmd}를 쓰세요. 비워두면 바로 전송.',
     'modal.edit.reset': '초기화',
     'modal.edit.cancel': '취소',
     'modal.edit.save': '저장',
+
+    'modal.prompt.titleFormat': '/{name} — 편집 후 전송',
+    'modal.prompt.placeholder': '전송 전에 프롬프트를 편집하세요…',
+    'modal.prompt.send': '▶ 전송',
+    'modal.prompt.cancel': '취소',
 
     'modal.achv.title': '🏆 업적 보드',
     'modal.achv.earned': '달성',
@@ -437,11 +456,9 @@ const STRINGS = {
     'modal.report.topCount': '{count}회',
 
     'exec.paste': '클립보드만 복사',
-    'exec.auto': '붙여넣기+엔터 자동 (mac/win/linux)',
     'exec.terminal': '터미널 실행',
     'exec.modeTitle': '실행 방식: {hint} (클릭으로 변경)',
     'exec.prefixPaste': '복사',
-    'exec.prefixAuto': '자동 실행',
     'exec.prefixTerminal': '터미널',
 
     'toast.buddyName': '이름 저장: {name}',
@@ -509,6 +526,7 @@ const STRINGS = {
     'card.usage': '使用 {count}回 · LV.{level}',
     'card.notUsed': '未使用',
     'card.copyHint': 'クリック → /{name} をコピー',
+    'card.promptBtnTitle': '送信前にプロンプト編集',
 
     'quickbar.unlockHint': '({unlocked}/6 解放 · 進化でさらに解放)',
     'quickbar.locked': '進化段階「{stage}」で解放',
@@ -517,6 +535,7 @@ const STRINGS = {
     'section.hidden': '非表示',
 
     'panel.empty': 'スキルがありません。~/.claude/skills に SKILL.md を追加してください。',
+    'panel.tplBannerHint': '各カードに 💬 ボタンが表示されます — タップで送信前にプロンプト編集。カード本体クリックはそのまま即送信。',
 
     'onboarding.title': 'ようこそ — スキルを準備しましょう',
     'onboarding.sub': 'このパネルはお使いのマシンの Claude Code スラッシュコマンドを自動で見つけます。下のいずれかから始めてください。',
@@ -568,9 +587,17 @@ const STRINGS = {
     'modal.edit.group': 'グループ',
     'modal.edit.groupAuto': '自動 (ソース基準)',
     'modal.edit.hide': 'パネルから隠す',
+    'modal.edit.promptTemplate': 'プロンプトテンプレート',
+    'modal.edit.promptTemplatePh': '例: "このファイルを分析" または "{cmd} をセキュリティ観点でレビュー"',
+    'modal.edit.promptTemplateHint': '前置テキストを書けば /スキル名 が末尾に自動付加されます。位置を指定したい時は {cmd} を使用。空欄なら直接送信。',
     'modal.edit.reset': 'リセット',
     'modal.edit.cancel': 'キャンセル',
     'modal.edit.save': '保存',
+
+    'modal.prompt.titleFormat': '/{name} — 編集して送信',
+    'modal.prompt.placeholder': '送信前にプロンプトを編集…',
+    'modal.prompt.send': '▶ 送信',
+    'modal.prompt.cancel': 'キャンセル',
 
     'modal.achv.title': '🏆 実績',
     'modal.achv.earned': '達成済',
@@ -673,11 +700,9 @@ const STRINGS = {
     'modal.report.topCount': '{count}回',
 
     'exec.paste': 'クリップボードにコピー',
-    'exec.auto': '自動ペースト & 送信 (mac/win/linux)',
     'exec.terminal': 'ターミナルで実行',
     'exec.modeTitle': '実行モード: {hint} (クリックで変更)',
     'exec.prefixPaste': 'コピー済',
-    'exec.prefixAuto': '送信済',
     'exec.prefixTerminal': 'ターミナル',
 
     'toast.buddyName': '名前を保存: {name}',
@@ -745,6 +770,7 @@ const STRINGS = {
     'card.usage': '使用 {count} 次 · LV.{level}',
     'card.notUsed': '尚未使用',
     'card.copyHint': '点击 → 复制 /{name}',
+    'card.promptBtnTitle': '发送前编辑提示词',
 
     'quickbar.unlockHint': '({unlocked}/6 解锁 · 进化解锁更多)',
     'quickbar.locked': '在「{stage}」阶段解锁',
@@ -753,6 +779,7 @@ const STRINGS = {
     'section.hidden': '已隐藏',
 
     'panel.empty': '未找到技能。请在 ~/.claude/skills 下添加 SKILL.md。',
+    'panel.tplBannerHint': '每张卡片都会显示 💬 按钮 — 点击它在发送前编辑提示词。卡片主体点击仍是立即发送。',
 
     'onboarding.title': '欢迎 — 让我们配置你的技能',
     'onboarding.sub': '此面板自动发现你机器上的所有 Claude Code 斜杠命令。从下面任选一条路径开始。',
@@ -804,9 +831,17 @@ const STRINGS = {
     'modal.edit.group': '分组',
     'modal.edit.groupAuto': '自动 (按来源)',
     'modal.edit.hide': '从面板隐藏',
+    'modal.edit.promptTemplate': '提示模板',
+    'modal.edit.promptTemplatePh': '例: "分析此文件" 或 "从安全角度审查 {cmd}"',
+    'modal.edit.promptTemplateHint': '输入前缀文字,/技能名 会自动附加到末尾。需要控制位置时用 {cmd}。留空则直接发送。',
     'modal.edit.reset': '重置',
     'modal.edit.cancel': '取消',
     'modal.edit.save': '保存',
+
+    'modal.prompt.titleFormat': '/{name} — 编辑后发送',
+    'modal.prompt.placeholder': '发送前编辑提示…',
+    'modal.prompt.send': '▶ 发送',
+    'modal.prompt.cancel': '取消',
 
     'modal.achv.title': '🏆 成就',
     'modal.achv.earned': '已获得',
@@ -909,11 +944,9 @@ const STRINGS = {
     'modal.report.topCount': '{count} 次',
 
     'exec.paste': '复制到剪贴板',
-    'exec.auto': '自动粘贴并发送 (mac/win/linux)',
     'exec.terminal': '在终端运行',
     'exec.modeTitle': '执行方式:{hint} (点击切换)',
     'exec.prefixPaste': '已复制',
-    'exec.prefixAuto': '已发送',
     'exec.prefixTerminal': '终端',
 
     'toast.buddyName': '名称已保存:{name}',

@@ -57,6 +57,7 @@ function applyOverrides(skill, cfg) {
     ...skill,
     label: entry.alias || skill.name,
     note: entry.note || '',
+    promptTemplate: entry.promptTemplate || '',
     hidden: !!entry.hidden,
     iconPath: entry.iconPath || null,
     sparkIcon: entry.sparkIcon || null,

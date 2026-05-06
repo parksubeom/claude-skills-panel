@@ -8,7 +8,9 @@
 
 ## Stop typing `/full-flow` from memory.
 
-If you use **[Claude Code](https://docs.claude.com/en/docs/claude-code)** (Anthropic's AI coding assistant) and you've installed even one plugin, you've probably got 30+ slash commands you can't remember.
+> **New here?** [Claude Code](https://docs.claude.com/en/docs/claude-code) is Anthropic's AI coding CLI. It runs in your terminal (or inside Cursor / VS Code) and is driven by *slash commands* (`/commit`, `/review`, …). Once you install a plugin or two, those commands pile up fast — and that's the problem this panel solves.
+
+If you use **Claude Code** and you've installed even one plugin, you've probably got 30+ slash commands you can't remember.
 
 **This is the panel for them.** One click to fire any command. Or `1`–`6`. Or fuzzy search. Or just browse.
 
@@ -29,9 +31,25 @@ If you use **[Claude Code](https://docs.claude.com/en/docs/claude-code)** (Anthr
 
 **All gamification is one toggle off.** The clean professional panel is one click away.
 
-> 외워서 타이핑하지 말고 한 번에 클릭 · もう打たないで、ワンクリックで起動 · 别再死记斜杠命令,一键触发
+> Stop memorizing — one click · 외워서 타이핑하지 말고 한 번에 클릭 · もう打たないで、ワンクリックで起動 · 别再死记斜杠命令,一键触发
 
 > Built mostly *with* Claude Code itself. Free, MIT, ~120 KB, no telemetry by default.
+
+---
+
+## Who is this for?
+
+**You'll feel the value within 10 seconds if any of these are true:**
+
+- ✅ You use Claude Code and have installed at least one plugin (`superpowers`, `code-review`, …)
+- ✅ Your `~/.claude/commands/` or `~/.claude/skills/` has 5+ custom entries
+- ✅ You moved from VS Code to Cursor / Windsurf and miss the plugin GUI
+- ✅ You'd rather hit `1`–`6` than retype `/commit-prepare` every time
+
+**You probably don't need this if:**
+
+- ❌ You haven't tried Claude Code yet — start [there](https://docs.claude.com/en/docs/claude-code) first
+- ❌ You only have 1–2 slash commands and remember them fine
 
 ---
 
@@ -51,10 +69,14 @@ If you use **[Claude Code](https://docs.claude.com/en/docs/claude-code)** (Anthr
 
 ## Install
 
-**Cursor / Windsurf / VS Codium** — install from [OpenVSX](https://open-vsx.org/extension/parksubeom/claude-skills-panel)
-**VS Code** — install from [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel)
+| IDE | Where |
+|---|---|
+| **VS Code** | [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=parksubeom.claude-skills-panel) |
+| **Cursor** | [OpenVSX](https://open-vsx.org/extension/parksubeom/claude-skills-panel) |
+| **Windsurf** | [OpenVSX](https://open-vsx.org/extension/parksubeom/claude-skills-panel) |
+| **VS Codium** | [OpenVSX](https://open-vsx.org/extension/parksubeom/claude-skills-panel) |
 
-> Or open the Extensions tab (`Cmd+Shift+X`), search `Claude Code Skills Panel`, and click **Install**.
+> Or open the Extensions tab (`Cmd+Shift+X`), search `Claude Code Skills Panel`, and click **Install** — it shows up in all four IDEs.
 
 ---
 
@@ -109,6 +131,10 @@ Drag your most-used skills to 6 slots and trigger them with number keys. Each sl
 All settings saved to `~/.claude/skills-panel-config.json` — version-controllable via dotfiles.
 
 ---
+
+## 🎮 Bonus: Pixel Adventure (optional)
+
+> Everything below this line is opt-in eye candy. Toggle it off in Settings if you only want a clean launcher.
 
 ### 🐾 Claude Skills Buddies — class-branch evolution
 

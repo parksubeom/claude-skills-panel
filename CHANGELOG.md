@@ -2,6 +2,74 @@
 
 All notable changes to this extension are documented here.
 
+## [0.39.0] — 2026-05-06
+
+### Added — Edit prompts before sending in terminal mode
+
+Terminal-mode users hit a sharp edge in v0.38 and earlier: clicking a card
+auto-sent `/skill\n` to the active terminal — great for one-shot commands,
+but `/review` or `/explain` usually want a target ("review **this file** for
+security issues"). Once Enter went out, you couldn't sneak the context in.
+
+v0.39 adds a dedicated **💬 prompt-edit button** on every card, visible only
+when exec mode is `▶💬 Term`:
+
+- **Click the card body** → fires immediately as before (consistent across modes).
+- **Click the 💬 button** → opens a pre-send edit modal. Type any prefix
+  ("review this file"), and `/skill` auto-appends at the end. Or save a per-
+  skill **Prompt template** in the edit modal (`{cmd}` placeholder) so the
+  modal pre-fills it for you.
+- A panel-wide hint banner appears under the search bar in terminal mode,
+  explaining the affordance ("each card now shows a 💬 button — tap it to
+  edit the prompt before sending").
+- `Cmd/Ctrl+Enter` sends from the modal, `Esc` cancels.
+
+Implementation: optional `promptTemplate` field on `cfg.skills[name]` (no
+migration needed), new webview modal mirroring the edit-modal pattern, new
+host message `copyWithPrompt` that writes the user's final text to clipboard
+or terminal — usage attribution still links back to the underlying skill name.
+
+i18n: 9 new keys × 4 locales (`modal.edit.promptTemplate*`, `modal.prompt.*`,
+`card.promptBtnTitle`, `panel.tplBannerHint`).
+
+### Removed — Auto execution mode (`▶ Auto`)
+
+The previous "auto" mode used `osascript` / `SendKeys` / `xdotool` to focus
+the Claude Code input, paste from clipboard, and send Enter. In practice it
+was unreliable against the Claude Code extension's React-driven input
+component, so it was producing more confusion ("why isn't this working?")
+than value. Removed in v0.39 in favor of the always-reliable `paste` + `terminal`
+pair.
+
+- Mode cycle is now `▶ Paste ↔ ▶💬 Term` (two-step toggle).
+- `osKeystroke()`, `tryFocus()`, and the auto branches in `dispatchExec` /
+  `copyWithPrompt` / `runRawCommand` are deleted.
+- i18n keys `exec.auto` / `exec.prefixAuto` removed from all four locales.
+- Migration: existing users with `cfg.meta.execMode === 'auto'` are silently
+  migrated to `paste` on first render.
+
+### Changed — README and Marketplace listing tuned for first-time visitors
+
+Previous listing assumed the reader already knew Claude Code. v0.39 fixes that:
+
+- **Hero defense line** — quick "What is Claude Code?" answer with a doc link,
+  for visitors arriving cold from a Marketplace search.
+- **"Who is this for?" section** — explicit ✅/❌ persona list. Tells you in
+  10 seconds whether the panel will help you, and tells the wrong audience
+  it's not for them (which is faster than installing and uninstalling).
+- **Install table** lifts Cursor / Windsurf / VS Codium to the same row as
+  VS Code. Previously buried under a one-liner; the four IDEs now read as
+  equally first-class.
+- **`## 🎮 Bonus: Pixel Adventure (optional)` heading** — the buddy / RPG
+  / theme content now lives under an explicitly opt-in heading, signaling
+  upfront that the serious-tool half and the pixel-game half are separable.
+- **Tagline now in 4 languages** (English added) for parity with package.json.
+- **`package.json` description** rewritten to lead with a non-command-specific
+  pain hook (was "Stop typing /commit-prepare from memory" — a name only some
+  users recognize) — now "Stop typing slash commands from memory."
+
+No code changes for the listing tune.
+
 ## [0.38.0] — 2026-05-02
 
 ### Fixed — Quick Bar layout never collapses on empty slots
