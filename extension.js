@@ -507,7 +507,6 @@ function renderHtml(webview, skills) {
           const original = escapeHtml(s.aliasOriginal);
           const desc = escapeHtml(s.note || s.description);
           const aliased = s.label !== s.aliasOriginal;
-          const kindBadge = s.kind === 'command' ? '<span class="kind-badge cmd">cmd</span>' : '';
           const starsHtml = s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>';
           const lvBadge = s.level > 0 ? `<span class="lv-badge lv${s.level}">LV.${s.level}</span>` : '';
           const sourceLine = s.plugin
@@ -531,7 +530,6 @@ function renderHtml(webview, skills) {
               data-plugin="${escapeHtml(s.plugin || '')}"
               data-marketplace="${escapeHtml(s.marketplace || '')}"
               data-group="${escapeHtml(s.customGroup || '')}">
-              ${kindBadge}
               ${lvBadge}
               <span class="prompt-btn" title="${t('card.promptBtnTitle')}">💬</span>
               <span class="edit-btn" title="${t('card.edit')}">✎</span>
@@ -589,7 +587,6 @@ function renderHtml(webview, skills) {
     const desc = escapeHtml(s.note || s.description);
     const aliased = s.label !== s.aliasOriginal;
     const lvBadge = s.level > 0 ? `<span class="lv-badge lv${s.level}">LV.${s.level}</span>` : '';
-    const kindBadge = s.kind === 'command' ? '<span class="kind-badge cmd">cmd</span>' : '';
     return `
       <button class="skill"
         data-name="${original}"
@@ -605,7 +602,6 @@ function renderHtml(webview, skills) {
         data-has-tokens="${s.tokenStats && s.tokenStats.total > 0 ? '1' : '0'}"
         data-last="${s.usage.lastUsed || ''}"
         data-level="${s.level}">
-        ${kindBadge}
         ${lvBadge}
         <span class="prompt-btn" title="${t('card.promptBtnTitle')}">💬</span>
         <span class="edit-btn" title="${t('card.edit')}">✎</span>
@@ -1811,25 +1807,6 @@ function renderHtml(webview, skills) {
     100% { transform: scale(1); filter: brightness(1); }
   }
   .skill.leveled-up { animation: level-up 0.6s ease-out; border-color: var(--accent-2) !important; }
-  .kind-badge {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    padding: 1px 4px;
-    border-radius: 2px;
-    background: var(--frame-strong);
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    text-transform: uppercase;
-    z-index: 4;
-    line-height: 1.2;
-    transition: opacity 0.12s;
-  }
-  .skill:hover .kind-badge { opacity: 0; }
-  .kind-badge.cmd { color: var(--good); border-color: var(--good); }
   .edit-btn {
     position: absolute;
     top: 4px;

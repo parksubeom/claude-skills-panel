@@ -2,6 +2,29 @@
 
 All notable changes to this extension are documented here.
 
+## [0.42.0] — 2026-05-06
+
+### Removed — `cmd` badge on slash-command cards
+
+Cards from `~/.claude/commands/<name>.md` (single-file command aliases,
+as opposed to skills under `~/.claude/skills/<name>/SKILL.md`) had a
+small uppercase `cmd` badge in the upper-right since v0.20-ish. The
+badge classified the source format, but in practice users trigger both
+identically with `/<name>` — the distinction never affected any
+workflow, and the badge competed with the LV, ✎, and 💬 markers in
+the same corner.
+
+The hover popover already shows source attribution
+(`🧩 superpowers @marketplace` etc.), so the hover answer covers any
+remaining curiosity.
+
+Removed:
+
+- `<span class="kind-badge cmd">cmd</span>` emit from both card
+  emitters.
+- `.kind-badge`, `.kind-badge.cmd`, and the hover-fade rule from CSS.
+- `kindBadge` template variable from both emitters.
+
 ## [0.41.0] — 2026-05-06
 
 ### Added — Buddy actions: monsters appear while Claude Code is busy
