@@ -156,6 +156,50 @@ function scanAll() {
   for (const f of listSessionFiles()) scanFile(f);
 }
 
+// Latest mtime across every JSONL — proxy for "Claude Code is doing
+// something right now". Doesn't read file content, only metadata.
+function latestMtimeMs() {
+  let max = 0;
+  for (const f of listSessionFiles()) {
+    try {
+      const m = fs.statSync(f).mtimeMs;
+      if (m > max) max = m;
+    } catch {}
+  }
+  return max;
+}
+
+// Activity state machine driven entirely by JSONL mtime. The caller polls
+// this every few seconds; we transition between idle / busy / completed.
+//   - busy:      a JSONL was modified within `busyWindowMs`
+//   - completed: previous tick was busy, this tick isn't (one-shot)
+//   - idle:      otherwise
+// `state` carries `latestMtimeMs` so callers can debounce repeated
+// "completed" transitions during very chatty sessions.
+let _activityPrev = 'idle';
+let _activityLastBusyMtime = 0;
+function getActivityState(busyWindowMs) {
+  const window = typeof busyWindowMs === 'number' ? busyWindowMs : 8000;
+  const latest = latestMtimeMs();
+  const now = Date.now();
+  const isBusyNow = latest > 0 && (now - latest) < window;
+  let state;
+  if (isBusyNow) {
+    state = 'busy';
+    _activityLastBusyMtime = latest;
+  } else if (_activityPrev === 'busy') {
+    state = 'completed';
+  } else {
+    state = 'idle';
+  }
+  _activityPrev = isBusyNow ? 'busy' : 'idle';
+  return { state, latestMtimeMs: latest, lastBusyMtime: _activityLastBusyMtime };
+}
+function resetActivity() {
+  _activityPrev = 'idle';
+  _activityLastBusyMtime = 0;
+}
+
 function getStatsFor(commandName) {
   const s = perCommand.get(commandName);
   if (!s) return null;
@@ -193,4 +237,7 @@ module.exports = {
   topByTokens,
   formatShort,
   listSessionFiles,
+  latestMtimeMs,
+  getActivityState,
+  resetActivity,
 };

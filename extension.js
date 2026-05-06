@@ -26,6 +26,35 @@ function stopTokenTracking() {
   tokenUsage.reset();
 }
 
+// Buddy actions lifecycle — independent of token tracking. Polls JSONL
+// mtime every 5s and pushes 'busy' / 'completed' / 'idle' to all webviews
+// so they can play fighting / completion animations. Only mtime is read,
+// no file content — privacy footprint identical to fs.stat.
+let _buddyActionsInterval = null;
+const _buddyActionsListeners = new Set();
+function startBuddyActions() {
+  if (_buddyActionsInterval) return;
+  const cfg = userConfig.read();
+  if (!cfg.meta || !cfg.meta.buddyActions) return;
+  tokenUsage.resetActivity();
+  const tick = () => {
+    let snap;
+    try { snap = tokenUsage.getActivityState(8000); } catch { return; }
+    for (const fn of _buddyActionsListeners) {
+      try { fn(snap); } catch {}
+    }
+  };
+  tick();
+  _buddyActionsInterval = setInterval(tick, 5000);
+}
+function stopBuddyActions() {
+  if (_buddyActionsInterval) { clearInterval(_buddyActionsInterval); _buddyActionsInterval = null; }
+  tokenUsage.resetActivity();
+  for (const fn of _buddyActionsListeners) {
+    try { fn({ state: 'idle', latestMtimeMs: 0 }); } catch {}
+  }
+}
+
 // Dispatch slash skill execution.
 //   paste    → clipboard only (caller already wrote) — user pastes manually
 //   terminal → send to active terminal with newline (or create one if absent)
@@ -623,9 +652,17 @@ function renderHtml(webview, skills) {
       }).join('')
     : `<div class="yard-empty">${t('buddy.yard.empty')}</div>`;
 
+  // Inline pixel monster — fades in only during fighting state. SVG so we
+  // don't ship a PNG for it; tone shifts via currentColor in CSS.
+  const monsterSvg = `<svg class="yard-monster" viewBox="0 0 16 16" aria-hidden="true">
+    <path fill="currentColor" d="M3 9 h1 v-1 h1 v-1 h1 v-1 h4 v1 h1 v1 h1 v1 h1 v3 h-1 v1 h-9 v-1 h-1 z M5 8 h1 v1 h-1 z M10 8 h1 v1 h-1 z" />
+    <path fill="currentColor" opacity="0.5" d="M2 13 h12 v1 h-12 z" />
+  </svg>`;
+
   const buddyYardHtml = `
     <div class="buddy-yard-wrap">
-      <div class="buddy-yard" id="buddy-yard" title="${t('buddy.yard.title')}">
+      <div class="buddy-yard" id="buddy-yard" title="${t('buddy.yard.title')}" data-buddy-state="idle">
+        ${monsterSvg}
         ${yardBuddyImgs()}
       </div>
       <button class="buddy-yard-btn" id="buddy-yard-btn" type="button">${t('buddy.yard.viewBtn')}</button>
@@ -1214,6 +1251,82 @@ function renderHtml(webview, skills) {
     margin: 4px 0 12px;
   }
 
+  /* Monster — visible only during fighting state. The buddies "fight" it
+     with their existing yard-walk animation; on completion it fades and
+     ✓! bubbles spawn above the buddies. */
+  .yard-monster {
+    position: absolute;
+    right: 12%;
+    bottom: 6px;
+    width: 26px;
+    height: 26px;
+    color: var(--magenta, #ec4899);
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+  .buddy-yard.fighting .yard-monster {
+    opacity: 1;
+    transform: translateY(0);
+    animation: monster-shake 0.45s ease-in-out infinite;
+  }
+  .buddy-yard.completed .yard-monster {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.6);
+  }
+  @keyframes monster-shake {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-2px, -1px); }
+    75%      { transform: translate(2px, 1px); }
+  }
+  /* Fighting tone — vignette + slight darkening so the mode is unmistakable.
+     Buddies dash 1.4× faster + scale up briefly on each cycle. */
+  .buddy-yard.fighting::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at right, rgba(236,72,153,0.18), transparent 60%);
+    pointer-events: none;
+  }
+  .buddy-yard.fighting .yard-buddy {
+    animation: yard-dash 1.6s ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  @keyframes yard-dash {
+    0%, 100% { transform: translateX(-8px) scale(1); }
+    40%      { transform: translateX(14px) scale(1.08); }
+    50%      { transform: translateX(14px) scale(1.08) scaleX(-1); }
+    90%      { transform: translateX(-8px) scale(1) scaleX(-1); }
+  }
+  /* Completion celebration — buddies pulse once, ✓! bubble floats up. */
+  .buddy-yard.completed .yard-buddy {
+    animation: yard-celebrate 0.8s ease-out;
+  }
+  @keyframes yard-celebrate {
+    0%   { transform: translateY(0) scale(1); }
+    40%  { transform: translateY(-10px) scale(1.15); }
+    100% { transform: translateY(0) scale(1); }
+  }
+  .victory-bubble {
+    position: absolute;
+    bottom: 38px;
+    transform: translateX(-50%);
+    color: var(--good, #22c55e);
+    font-size: 12px;
+    font-weight: 700;
+    pointer-events: none;
+    text-shadow: 0 0 4px var(--good, #22c55e);
+    animation: victory-float 1.2s ease-out forwards;
+  }
+  @keyframes victory-float {
+    0%   { opacity: 0; transform: translate(-50%, 8px) scale(0.5); }
+    20%  { opacity: 1; transform: translate(-50%, -2px) scale(1.1); }
+    80%  { opacity: 1; transform: translate(-50%, -16px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -28px) scale(0.9); }
+  }
+
   .lv-badge {
     position: absolute;
     top: 4px;
@@ -1414,44 +1527,6 @@ function renderHtml(webview, skills) {
   .qslot.filled[draggable="true"] { cursor: grab; }
   .qslot.filled[draggable="true"]:active { cursor: grabbing; }
   .qslot.dragging { opacity: 0.4; }
-
-  /* Free-roaming buddy pet */
-  .buddy-pet {
-    position: fixed;
-    width: 56px;
-    height: 56px;
-    cursor: pointer;
-    z-index: 50;
-    pointer-events: auto;
-    left: 24px;
-    top: 64px;
-    transition: left 1.4s cubic-bezier(0.4, 0, 0.2, 1), top 1.4s cubic-bezier(0.4, 0, 0.2, 1);
-    user-select: none;
-  }
-  .buddy-pet img {
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
-    display: block;
-    animation: pet-bob 2.4s ease-in-out infinite;
-    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
-  }
-  .buddy-pet:hover img {
-    animation-play-state: paused;
-    filter: drop-shadow(0 0 6px var(--accent-2)) drop-shadow(0 2px 0 rgba(0,0,0,0.5));
-  }
-  .buddy-pet.flipped img { transform: scaleX(-1); }
-  .buddy-pet.cheering img { animation: pet-cheer 0.6s ease-out; }
-  @keyframes pet-bob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
-  }
-  @keyframes pet-cheer {
-    0% { transform: translateY(0) scale(1); }
-    30% { transform: translateY(-12px) scale(1.15); }
-    60% { transform: translateY(-2px) scale(1.05); }
-    100% { transform: translateY(0) scale(1); }
-  }
 
   /* Buddy hero in modal */
   .buddy-hero {
@@ -2402,9 +2477,6 @@ function renderHtml(webview, skills) {
     <a class="footer-link" id="footer-issue" href="#" title="${t('footer.issue')}">${t('footer.issue')}</a>
   </div>
   <div class="toast" id="toast"></div>
-  <div class="buddy-pet" id="buddy-pet" title="${escapeHtml(character.name)} — ${escapeHtml(character.stageName)}">
-    ${buddyImg ? `<img src="${buddyImg}" alt="${escapeHtml(character.name)}" />` : '🥚'}
-  </div>
 
   <div class="modal-bg" id="modal-bg">
     <div class="modal" id="modal">
@@ -2550,6 +2622,15 @@ function renderHtml(webview, skills) {
           <button class="btn" data-tokens="off" id="tok-off">${t('modal.settings.tokensOff')}</button>
         </div>
         <div class="hint" id="tok-status" style="margin-top:4px;">${t('modal.settings.tokensCurrent', { value: trackTokens ? t('modal.settings.tokensOn') : t('modal.settings.tokensOff') })}</div>
+      </div>
+      <div class="settings-section">
+        <label>${t('modal.settings.buddyActions')}</label>
+        <div class="hint">${t('modal.settings.buddyActionsHint')}</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" data-buddyactions="on" id="bact-on">${t('modal.settings.buddyActionsOn')}</button>
+          <button class="btn" data-buddyactions="off" id="bact-off">${t('modal.settings.buddyActionsOff')}</button>
+        </div>
+        <div class="hint" id="bact-status" style="margin-top:4px;">${t('modal.settings.buddyActionsCurrent', { value: (cfg.meta && cfg.meta.buddyActions) ? t('modal.settings.buddyActionsOn') : t('modal.settings.buddyActionsOff') })}</div>
       </div>
       <div class="modal-actions">
         <button class="btn" id="settings-close">${t('modal.settings.close')}</button>
@@ -2805,6 +2886,13 @@ function sfxCopy() {
   setTimeout(() => beep({ freq: 1320, duration: 0.08, vol: 0.05 }), 60);
 }
 function sfxOpen() { beep({ freq: 520, duration: 0.05, slide: 200, vol: 0.04 }); }
+// 3-tone victory chime — used when the panel detects the user's task ended
+// (last JSONL mtime + 5s of inactivity).
+function sfxComplete() {
+  beep({ freq: 660, duration: 0.08, vol: 0.05 });
+  setTimeout(() => beep({ freq: 880, duration: 0.08, vol: 0.05 }), 90);
+  setTimeout(() => beep({ freq: 1180, duration: 0.12, vol: 0.05 }), 200);
+}
 
 soundBtn.addEventListener('click', () => {
   STATE.sound = !STATE.sound;
@@ -2859,12 +2947,10 @@ const achvBg = document.getElementById('achv-bg');
 const reportBg = document.getElementById('report-bg');
 const buddyBg = document.getElementById('buddy-bg');
 const groupsBg = document.getElementById('groups-bg');
-const buddyPet = document.getElementById('buddy-pet');
 document.getElementById('achv-btn').addEventListener('click', () => { achvBg.classList.add('show'); sfxOpen(); });
 document.getElementById('report-btn').addEventListener('click', () => { reportBg.classList.add('show'); sfxOpen(); });
 const groupsBtn = document.getElementById('groups-btn');
 if (groupsBtn) groupsBtn.addEventListener('click', () => { groupsBg.classList.add('show'); sfxOpen(); });
-if (buddyPet) buddyPet.addEventListener('click', () => { buddyBg.classList.add('show'); sfxOpen(); });
 document.getElementById('achv-close').addEventListener('click', () => achvBg.classList.remove('show'));
 document.getElementById('report-close').addEventListener('click', () => reportBg.classList.remove('show'));
 const reportCopyBtn = document.getElementById('report-copy-md');
@@ -2912,6 +2998,45 @@ document.querySelectorAll('.yard-buddy').forEach((b) => {
     sfxOpen();
   });
 });
+
+// Buddy activity state machine — driven by host postMessage from JSONL
+// mtime polling. Toggles fighting/completed CSS classes on every yard
+// instance (inline + modal), spawns a "✓!" bubble per buddy on
+// completion, and rings the 3-tone chime + toast.
+function handleBuddyActivity(state) {
+  const yards = [
+    document.getElementById('buddy-yard'),
+    document.querySelector('.buddy-yard-modal-inner'),
+  ].filter(Boolean);
+  for (const y of yards) {
+    y.dataset.buddyState = state;
+    y.classList.remove('fighting', 'completed');
+    if (state === 'busy') y.classList.add('fighting');
+    if (state === 'completed') y.classList.add('completed');
+  }
+  if (state === 'completed') {
+    sfxComplete();
+    showToast(t('toast.taskComplete'));
+    spawnVictoryBubbles();
+    // Auto-clear the "completed" decoration after the bubble has bloomed
+    setTimeout(() => {
+      yards.forEach((y) => y.classList.remove('completed'));
+    }, 1400);
+  }
+}
+function spawnVictoryBubbles() {
+  document.querySelectorAll('.yard-buddy').forEach((b, i) => {
+    const bubble = document.createElement('span');
+    bubble.className = 'victory-bubble';
+    bubble.textContent = '✓!';
+    bubble.style.animationDelay = (i * 60) + 'ms';
+    b.parentNode.appendChild(bubble);
+    // Position the bubble above this buddy
+    const left = b.style.left || '50%';
+    bubble.style.left = left;
+    setTimeout(() => bubble.remove(), 1400);
+  });
+}
 
 // Group management interactions
 (function wireGroups() {
@@ -2977,51 +3102,6 @@ document.querySelectorAll('.yard-buddy').forEach((b) => {
 })();
 
 // ---- Free-roaming pet wander ----
-const PET_W = 56;
-let petWanderTimer = null;
-function petMove(x, y) {
-  if (!buddyPet) return;
-  const w = window.innerWidth - PET_W - 16;
-  const h = window.innerHeight - PET_W - 16;
-  const cx = Math.max(8, Math.min(w, x));
-  const cy = Math.max(8, Math.min(h, y));
-  // flip horizontally based on direction
-  const prevLeft = parseFloat(buddyPet.style.left || '24');
-  if (cx > prevLeft + 4) buddyPet.classList.remove('flipped');
-  else if (cx < prevLeft - 4) buddyPet.classList.add('flipped');
-  buddyPet.style.left = cx + 'px';
-  buddyPet.style.top = cy + 'px';
-}
-function petWanderLoop() {
-  if (!buddyPet) return;
-  const w = window.innerWidth - PET_W - 16;
-  const h = window.innerHeight - PET_W - 16;
-  petMove(8 + Math.random() * w, 60 + Math.random() * Math.max(40, h - 80));
-  const next = 6000 + Math.random() * 9000;
-  petWanderTimer = setTimeout(petWanderLoop, next);
-}
-function petToCard(card) {
-  if (!buddyPet || !card) return;
-  const r = card.getBoundingClientRect();
-  // place to the right of the card if room, else left
-  let x = r.right + 6;
-  if (x + PET_W > window.innerWidth - 8) x = r.left - PET_W - 6;
-  const y = r.top + r.height / 2 - PET_W / 2;
-  petMove(x, y);
-  buddyPet.classList.add('cheering');
-  setTimeout(() => buddyPet.classList.remove('cheering'), 700);
-  // re-arm wander timer so we don't immediately wander away
-  if (petWanderTimer) {
-    clearTimeout(petWanderTimer);
-    petWanderTimer = setTimeout(petWanderLoop, 6000);
-  }
-}
-// Initial position + idle loop
-if (buddyPet) {
-  buddyPet.style.left = '24px';
-  buddyPet.style.top = '64px';
-  petWanderTimer = setTimeout(petWanderLoop, 5000);
-}
 document.getElementById('buddy-save-name').addEventListener('click', () => {
   const name = document.getElementById('buddy-name-input').value.trim();
   vscode.postMessage({ type: 'setBuddyName', name });
@@ -3222,7 +3302,6 @@ document.getElementById('prompt-modal-send').addEventListener('click', () => {
   if (element) {
     element.classList.add('copied');
     setTimeout(() => element.classList.remove('copied'), 600);
-    petToCard(element);
     spawnRipple(element, evt);
   }
   const prefix = ({ paste: t('exec.prefixPaste'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
@@ -3303,6 +3382,9 @@ window.addEventListener('message', (e) => {
   if (m && m.type === 'showAchievements') achvBg.classList.add('show');
   if (m && m.type === 'showWeeklyReport') reportBg.classList.add('show');
   if (m && m.type === 'toast' && m.key) showToast(t(m.key, m.vars));
+  if (m && m.type === 'buddyActivity' && (m.state === 'idle' || m.state === 'busy' || m.state === 'completed')) {
+    handleBuddyActivity(m.state);
+  }
   if (m && m.type === 'marketplaceCatalog') {
     marketCatalog = m.catalog || { marketplaces: [], plugins: [] };
     // Populate category filter
@@ -3458,7 +3540,6 @@ function triggerSkill(name, file, opts) {
   if (opts && opts.element) {
     opts.element.classList.add('copied');
     setTimeout(() => opts.element.classList.remove('copied'), 600);
-    petToCard(opts.element);
     spawnRipple(opts.element, opts.event);
   }
 }
@@ -3605,7 +3686,6 @@ document.querySelectorAll('.skill').forEach((el) => {
     vscode.postMessage({ type: 'copy', name, execMode: STATE.execMode || 'off' });
     el.classList.add('copied');
     sfxCopy();
-    petToCard(el);
     spawnRipple(el, e);
     setTimeout(() => el.classList.remove('copied'), 600);
     const prefix = ({ paste: t('exec.prefixPaste'), terminal: t('exec.prefixTerminal') })[STATE.execMode] || t('exec.prefixPaste');
@@ -3867,6 +3947,12 @@ function setTokens(value) { vscode.postMessage({ type: 'setTokens', value }); sf
 if (tokOn) tokOn.addEventListener('click', () => setTokens('on'));
 if (tokOff) tokOff.addEventListener('click', () => setTokens('off'));
 
+const bactOn = document.getElementById('bact-on');
+const bactOff = document.getElementById('bact-off');
+function setBuddyActions(value) { vscode.postMessage({ type: 'setBuddyActions', value }); sfxClick(); }
+if (bactOn) bactOn.addEventListener('click', () => setBuddyActions('on'));
+if (bactOff) bactOff.addEventListener('click', () => setBuddyActions('off'));
+
 // Footer external links (asWebviewUri/CSP can be picky; route through host)
 const footerRate = document.getElementById('footer-rate');
 const footerIssue = document.getElementById('footer-issue');
@@ -3994,6 +4080,17 @@ class SkillsViewProvider {
         this.refresh();
         for (const v of this.views) {
           v.webview.postMessage({ type: 'toast', key: msg.value === 'on' ? 'toast.tokensEnabled' : 'toast.tokensDisabled' });
+        }
+      } else if (msg.type === 'setBuddyActions' && (msg.value === 'on' || msg.value === 'off')) {
+        const cfg = userConfig.read();
+        if (!cfg.meta) cfg.meta = {};
+        cfg.meta.buddyActions = msg.value === 'on';
+        userConfig.write(cfg);
+        if (msg.value === 'on') startBuddyActions();
+        else stopBuddyActions();
+        this.refresh();
+        for (const v of this.views) {
+          v.webview.postMessage({ type: 'toast', key: msg.value === 'on' ? 'toast.buddyActionsEnabled' : 'toast.buddyActionsDisabled' });
         }
       } else if (msg.type === 'runRawCommand' && typeof msg.command === 'string') {
         // Dispatched by onboarding "install superpowers" button.
@@ -4144,7 +4241,17 @@ class SkillsViewProvider {
 function activate(context) {
   loadPixelManifest(context.extensionPath);
   startTokenTracking();
+  startBuddyActions();
   const provider = new SkillsViewProvider(context);
+  // Wire activity ticks → broadcast to every webview as state changes.
+  let _lastBroadcastState = null;
+  _buddyActionsListeners.add((snap) => {
+    if (snap.state === _lastBroadcastState && snap.state !== 'busy') return;
+    _lastBroadcastState = snap.state;
+    for (const v of provider.views) {
+      v.webview.postMessage({ type: 'buddyActivity', state: snap.state });
+    }
+  });
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('claudeSkillsGridSidebar', provider, {
@@ -4215,6 +4322,7 @@ function activate(context) {
 
 function deactivate() {
   stopTokenTracking();
+  stopBuddyActions();
 }
 
 module.exports = { activate, deactivate };

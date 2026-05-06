@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "Stop typing slash commands from memory. Auto-discovers every Claude Code skill, custom command, and plugin on your machine — fire with one click or keys 1–6. Built-in marketplace browser for 243+ plugins. Free, MIT. EN · 한국어 · 日本語 · 中文.",
-  "version": "0.40.0",
+  "version": "0.41.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",

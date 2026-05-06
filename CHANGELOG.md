@@ -2,6 +2,62 @@
 
 All notable changes to this extension are documented here.
 
+## [0.41.0] — 2026-05-06
+
+### Added — Buddy actions: monsters appear while Claude Code is busy
+
+The yard now reacts to whether Claude Code is actively working. When
+`buddyActions` is enabled in Settings, the panel polls the mtime of
+your `~/.claude/projects/*.jsonl` files every 5 seconds (mtime only —
+no file content is read, no prompt text touched). A simple state machine
+flips between three modes:
+
+- **idle**: nothing changed in the last 8s → the yard does its usual
+  back-and-forth idle walk.
+- **busy**: a JSONL was modified within 8s → a small pixel monster fades
+  in on the right of the yard, the buddies switch to a 1.6s `dash`
+  animation (forward lunge → flip → return), and a soft magenta vignette
+  drapes the diorama. Visually unmistakable: Claude Code is doing work.
+- **completed**: previous tick was busy, this tick isn't (one-shot) → the
+  monster fades up and out, every buddy plays a one-time celebrate hop,
+  a `✓!` bubble floats above each buddy with a 60ms stagger, a 3-tone
+  8-bit chime fires (660 → 880 → 1180 Hz), and a "🎉 Task complete!"
+  toast appears.
+
+The signal is independent of token tracking — `cfg.meta.buddyActions`
+is its own toggle, default **off**. You can run buddy actions without
+token tracking and vice versa. Both are off by default; both share the
+same `~/.claude/projects/` path but read different things (mtime
+metadata vs. message.usage records).
+
+The 8s busy window naturally debounces rapid back-to-back commands —
+quick consecutive turns stay in `busy` instead of flickering through
+`completed`.
+
+i18n: 8 new keys × 4 locales (`modal.settings.buddyActions*`,
+`toast.taskComplete`, `toast.buddyActions{Enabled,Disabled}`).
+
+### Removed — Free-roaming buddy pet (the panel-floating one)
+
+The single floating pet that wandered the panel and snapped to the
+last-clicked card was redundant once the Buddy Yard arrived in v0.40 —
+the yard already shows every class the user has invoked, all at once,
+in a richer scene. Keeping the floating pet was just stacking two
+buddy systems on top of each other.
+
+Removed:
+
+- `<div class="buddy-pet">` from `renderHtml`.
+- `.buddy-pet`, `.buddy-pet img`, `.buddy-pet:hover img`, `.buddy-pet.flipped`,
+  `.buddy-pet.cheering`, `@keyframes pet-bob`, `@keyframes pet-cheer` CSS.
+- `petMove`, `petWanderLoop`, `petToCard`, `petWanderTimer`, the initial
+  position setup, and the click handler.
+- All three `petToCard()` call sites (card click, Quick Bar slot click,
+  `triggerSkill`).
+
+Net diff: ~120 lines removed, ~0.8 KB packaged size reduction. The
+character sheet modal stays — opened by clicking any buddy in the yard.
+
 ## [0.40.0] — 2026-05-06
 
 ### Added — Per-skill token usage tracking (opt-in)
