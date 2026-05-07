@@ -23,8 +23,15 @@ const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const COMMAND_RE = /<command-name>\/?([\w.\-:]+)<\/command-name>/;
 
 // In-memory state
+//
+// Linkage between user <command-name> markers and assistant `message.usage`:
+// Claude Code's JSONL writes assistant lines with `promptId: null` — every
+// turn instead carries `uuid` + `parentUuid`, forming a chain back to the
+// triggering user message. So we map by uuid and walk the parent chain
+// when attributing usage to a command.
 const perCommand = new Map();   // cmdName -> stats object
-const promptToCmd = new Map();  // promptId -> cmdName
+const uuidToCmd = new Map();    // user-marker uuid -> cmdName
+const uuidToParent = new Map(); // any uuid -> parent uuid (parentUuid chain lookup)
 const fileOffsets = new Map();  // filepath -> last byte processed
 const fileSizes = new Map();    // filepath -> size at last scan (truncation detection)
 let _mostRecentCommand = null;  // Last <command-name> seen in any user line — drives the buddy yard's active fighter selection
@@ -44,10 +51,25 @@ function emptyStats() {
 
 function reset() {
   perCommand.clear();
-  promptToCmd.clear();
+  uuidToCmd.clear();
+  uuidToParent.clear();
   fileOffsets.clear();
   fileSizes.clear();
   _mostRecentCommand = null;
+}
+
+// Walk parentUuid chain (max ~100 hops to defend against pathological loops)
+// looking for an ancestor we registered as a command-marker user line.
+function findRootCmd(startUuid) {
+  let u = startUuid;
+  let hops = 0;
+  while (u && hops < 100) {
+    const cmd = uuidToCmd.get(u);
+    if (cmd) return cmd;
+    u = uuidToParent.get(u);
+    hops++;
+  }
+  return null;
 }
 
 function getMostRecentCommand() {
@@ -79,18 +101,22 @@ function processLine(line, file) {
   try { obj = JSON.parse(line); } catch { return; }
   if (!obj || typeof obj !== 'object') return;
 
-  // Slash command marker — register the promptId so subsequent assistant
-  // turns can be attributed back to the originating skill.
+  // Always record the parent chain so later assistant lines can walk it.
+  if (obj.uuid) {
+    uuidToParent.set(obj.uuid, obj.parentUuid || null);
+  }
+
+  // Slash command marker — register THIS user line's uuid as the root
+  // for any descendant assistant turns. (Claude Code emits promptId:null
+  // on every line, so uuid + parentUuid is the only working linkage.)
   if (obj.type === 'user' && obj.message && typeof obj.message.content === 'string') {
     const m = COMMAND_RE.exec(obj.message.content);
-    if (m && obj.promptId) {
+    if (m && obj.uuid) {
       const cmd = m[1];
-      promptToCmd.set(obj.promptId, cmd);
+      uuidToCmd.set(obj.uuid, cmd);
       _mostRecentCommand = cmd;
-      // Initialize bucket and bump invocation count exactly once per marker
       const stats = perCommand.get(cmd) || emptyStats();
       stats.invocations += 1;
-      // Track unique sessions seen — use file path as session proxy
       stats._sessions = stats._sessions || new Set();
       stats._sessions.add(file);
       stats.sessions = stats._sessions.size;
@@ -101,9 +127,10 @@ function processLine(line, file) {
     return;
   }
 
-  // Assistant turn — if its promptId was registered, accumulate usage.
-  if (obj.type === 'assistant' && obj.promptId && obj.message && obj.message.usage) {
-    const cmd = promptToCmd.get(obj.promptId);
+  // Assistant turn — walk the parentUuid chain until we hit a command
+  // marker we registered, then attribute the usage to that command.
+  if (obj.type === 'assistant' && obj.message && obj.message.usage) {
+    const cmd = findRootCmd(obj.parentUuid);
     if (!cmd) return;
     const u = obj.message.usage;
     const stats = perCommand.get(cmd) || emptyStats();

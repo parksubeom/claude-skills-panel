@@ -2,6 +2,43 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.5] — 2026-05-07
+
+### Fixed — Token tracking now actually attributes usage to commands
+
+Token tracking enabled, JSONL files present and full of slash-command
+markers, perfect i18n + UI plumbing — and the per-card token labels
+were still empty. Investigation:
+
+```
+user <command-name> markers: 7
+assistant w/ usage: 1042
+matching promptIds: 0  ← oops
+```
+
+Claude Code's JSONL writes assistant lines with `promptId: null` on
+every entry. Linkage between a user `<command-name>` marker and the
+assistant turns it triggered actually flows through `uuid` /
+`parentUuid` — every line knows its own `uuid` and points at its
+predecessor via `parentUuid`. Tool use, sidechains, and multi-turn
+chains can be many hops deep.
+
+`tokenUsage.processLine` was indexing by `promptId`, so 0 / 1042
+assistant turns ever matched anything.
+
+Fix: switch the linkage to `uuid` + parent-chain walk.
+
+- Replaced `promptToCmd: Map<promptId, cmd>` with two maps:
+  `uuidToCmd: Map<uuid, cmd>` (only for user marker lines) and
+  `uuidToParent: Map<uuid, parentUuid>` (every line).
+- Added `findRootCmd(uuid)` — walks the parent chain (max 100 hops)
+  until it hits a registered command-marker uuid.
+- `processLine` for assistant lines: `findRootCmd(obj.parentUuid)`
+  and accumulate usage to that command.
+
+Result on a real session — 203M tokens for `/full-flow`, 108M for
+`/work-log`, etc. Previously: zero tokens, empty card labels.
+
 ## [0.44.4] — 2026-05-07
 
 ### Security — defense-in-depth pass on three medium-severity surfaces
