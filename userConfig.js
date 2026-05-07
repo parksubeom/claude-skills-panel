@@ -546,9 +546,20 @@ function swapQuickbar(from, to) {
 
 function resolveIconPath(iconRel) {
   if (!iconRel) return null;
-  // Allow absolute paths or relative to ~/.claude
-  const abs = path.isAbsolute(iconRel) ? iconRel : path.join(CONFIG_DIR, iconRel);
-  return fs.existsSync(abs) ? abs : null;
+  // Resolve relative to ~/.claude, then enforce that the result lives
+  // inside our managed icon dir. This blocks both:
+  //   - hand-edited cfg with an absolute path pointing anywhere on disk
+  //   - relative paths with ../ traversal
+  // The webview can only display files vscode allows via localResourceRoots
+  // anyway, but defense-in-depth prevents a path leaking through other
+  // code paths (unlinkSync target, fs.existsSync probing arbitrary paths).
+  const candidate = path.isAbsolute(iconRel) ? iconRel : path.join(CONFIG_DIR, iconRel);
+  const resolved = path.resolve(candidate);
+  const allowedRoot = path.resolve(ICONS_DIR) + path.sep;
+  if (!resolved.startsWith(allowedRoot) && resolved !== path.resolve(ICONS_DIR)) {
+    return null;
+  }
+  return fs.existsSync(resolved) ? resolved : null;
 }
 
 module.exports = {

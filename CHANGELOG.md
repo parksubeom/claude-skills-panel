@@ -2,6 +2,78 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.4] — 2026-05-07
+
+### Security — defense-in-depth pass on three medium-severity surfaces
+
+A self-review pass with a security-reviewer hat on. No known exploit
+chains; all three findings are defensive hardening against future
+mistakes or compromised inputs.
+
+#### 1. Prototype-pollution guard on `saveConfig` and `importSettings`
+
+`saveConfig` accepts `msg.name` from the webview and uses it as a
+dynamic key (`cfg.skills[msg.name]`). If an attacker could deliver a
+crafted message with `msg.name === '__proto__'`, the assignment would
+target Object.prototype rather than `cfg.skills`. Today there's no
+known path to deliver such a message (webviews are sandboxed and the
+only producer is our own UI), but the cost of guarding is one Set
+membership check.
+
+- New `DANGEROUS_KEYS` set (`__proto__`, `constructor`, `prototype`).
+- `saveConfig` early-returns when `msg.name` is in the set.
+- `importSettings` now runs every parsed object through
+  `stripDangerousKeys()` before write — recursive walk that deletes
+  any key in the set so a tampered settings export can't smuggle a
+  prototype-polluting key onto disk.
+
+#### 2. HTML-escape every field from third-party marketplace.json
+
+`renderMarketList` and the category-filter populator both built
+`innerHTML` with hand-rolled `[<>"']` filtering on some fields and
+no filter at all on others (`category`, `marketplace`). Marketplaces
+under `~/.claude/plugins/marketplaces/` are user-added but third-party
+content; treating them as fully trusted is wrong.
+
+- New webview-side `htmlEscape()` helper — full `& < > " '` coverage.
+- Every marketplace catalog field that lands in `innerHTML`
+  (`name`, `description`, `category`, `author`, `marketplace`,
+  `homepage`, `installCmd`) now goes through `htmlEscape` first.
+- i18n strings injected into innerHTML also escaped (mostly redundant
+  since they're our own bundle, but consistent).
+
+#### 3. `resolveIconPath` is no longer a free-form file probe
+
+`resolveIconPath(iconRel)` was happy to return any absolute path the
+config asked for, as long as `fs.existsSync` said it was a real file.
+The webview wouldn't actually render a path outside `localResourceRoots`,
+but other call sites (`fs.unlinkSync` on the previous icon, `fs.existsSync`
+probes) used the resolved value directly.
+
+- `resolveIconPath` now resolves the candidate, then enforces that the
+  result lives inside `ICONS_DIR` (`~/.claude/skills-panel-icons/`).
+- Both absolute paths and relative `../` traversal attempts return
+  `null` if they escape the managed directory.
+
+### What stayed unchanged (already safe)
+
+- CSP: `default-src 'none'` + `connect-src 'none'` blocks all outbound
+  network requests from the webview. No fetch / XHR call exists in
+  webview JS either; CSP is the second layer.
+- No secrets in the repo. CI uses `OVSX_PAT` / `VSCE_PAT` from GitHub
+  Actions secrets.
+- `child_process` was removed in v0.41 along with auto exec mode.
+  No shell-injection surface remains.
+- Token tracking (`tokenUsage.js`) reads only `message.usage`,
+  `promptId`, `parentUuid`, `timestamp`, and the `<command-name>`
+  marker regex. The full message body is parsed but never persisted.
+- `pickIcon` already sanitizes the destination filename
+  (`[^a-zA-Z0-9_-]/g → _`) and writes only into `ICONS_DIR`.
+- `JSON.parse` callers all carry `try`/`catch` and fall back to a
+  default object.
+- Telemetry is display-only (`window.__telemetry` drives a banner +
+  status text); nothing leaves the machine.
+
 ## [0.44.3] — 2026-05-07
 
 ### Fixed — Demo GIFs no longer have huge top/bottom padding

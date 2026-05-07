@@ -8,6 +8,28 @@ const achievements = require('./achievements');
 const i18n = require('./i18n/strings');
 const tokenUsage = require('./tokenUsage');
 
+// Defense-in-depth against prototype pollution. JSON.parse usually
+// places these as own properties (so the parent prototype isn't
+// mutated), but dynamic-key access (`cfg.skills[name]`) becomes
+// undefined behavior when the name is one of these. Reject early
+// and recursively strip from imported objects.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function stripDangerousKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    for (const v of obj) stripDangerousKeys(v);
+    return obj;
+  }
+  for (const k of Object.keys(obj)) {
+    if (DANGEROUS_KEYS.has(k)) {
+      delete obj[k];
+      continue;
+    }
+    stripDangerousKeys(obj[k]);
+  }
+  return obj;
+}
+
 // Token tracking lifecycle — only running when cfg.meta.trackTokens is on.
 // Default OFF so that JSONL session files are never read unless the user
 // explicitly opts in.
@@ -3046,6 +3068,18 @@ function t(key, vars) {
   if (vars) s = s.replace(/\\{(\\w+)\\}/g, (m, k) => k in vars ? String(vars[k]) : m);
   return s;
 }
+// Webview-side HTML escape — used wherever we inject marketplace
+// catalog content (third-party data from ~/.claude/plugins/marketplaces/)
+// into innerHTML. innerHTML alone with hand-rolled char filtering missed
+// '&', and category fields had no filter at all.
+function htmlEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 const search = document.getElementById('search');
 const toast = document.getElementById('toast');
 const soundBtn = document.getElementById('sound-toggle');
@@ -3757,8 +3791,11 @@ window.addEventListener('message', (e) => {
     // Populate category filter
     const cats = new Set(marketCatalog.plugins.map((p) => p.category).filter(Boolean));
     if (marketCatSel) {
-      const opts = ['<option value="__all__">' + (STR['modal.market.allCats'] || 'All categories') + '</option>'];
-      [...cats].sort().forEach((c) => opts.push('<option value="' + c + '">' + c + '</option>'));
+      const opts = ['<option value="__all__">' + htmlEscape(STR['modal.market.allCats'] || 'All categories') + '</option>'];
+      [...cats].sort().forEach((c) => {
+        const e = htmlEscape(c);
+        opts.push('<option value="' + e + '">' + e + '</option>');
+      });
       marketCatSel.innerHTML = opts.join('');
     }
     renderMarketList();
@@ -4212,19 +4249,27 @@ function renderMarketList() {
   });
   marketStatus.textContent = t('modal.market.count', { shown: items.length, total: marketCatalog.plugins.length });
   marketList.innerHTML = items.slice(0, 200).map((p) => {
-    const safeName = p.name.replace(/[<>"']/g, '');
-    const desc = (p.description || '').replace(/[<>"']/g, '').slice(0, 220);
-    const installCmd = '/plugin install ' + safeName + '@' + p.marketplace;
+    // Catalog comes from third-party marketplace.json; treat every field as
+    // untrusted and run through htmlEscape before innerHTML inject.
+    const name = htmlEscape(p.name);
+    const desc = htmlEscape((p.description || '').slice(0, 220));
+    const cat = htmlEscape(p.category || '');
+    const author = htmlEscape(p.author || '');
+    const marketplace = htmlEscape(p.marketplace || '');
+    const homepage = htmlEscape(p.homepage || '');
+    // installCmd uses raw values inside a data-attr; htmlEscape handles
+    // both the attribute-quote case and any embedded HTML metachars.
+    const installCmd = htmlEscape('/plugin install ' + p.name + '@' + p.marketplace);
     return '<div class="market-card ' + (p.installed ? 'installed' : '') + '">' +
-      '<div class="market-name">' + safeName + ' <span class="market-cat">' + (p.category || '') + '</span></div>' +
+      '<div class="market-name">' + name + ' <span class="market-cat">' + cat + '</span></div>' +
       '<div class="market-desc">' + desc + '</div>' +
-      '<div class="market-meta">' + (p.author ? '<span>' + p.author.replace(/[<>"']/g, '') + '</span>' : '') +
-        ' <code>' + p.marketplace + '</code></div>' +
+      '<div class="market-meta">' + (author ? '<span>' + author + '</span>' : '') +
+        ' <code>' + marketplace + '</code></div>' +
       '<div class="market-actions">' +
         (p.installed
-          ? '<span class="market-badge">✓ ' + t('modal.market.installed') + '</span>'
-          : '<button class="btn btn-primary market-install-btn" data-cmd="' + installCmd.replace(/"/g, '&quot;') + '" type="button">' + t('modal.market.install') + '</button>') +
-        (p.homepage ? '<a class="market-link" data-url="' + p.homepage.replace(/"/g, '&quot;') + '" href="#">' + t('modal.market.home') + '</a>' : '') +
+          ? '<span class="market-badge">✓ ' + htmlEscape(t('modal.market.installed')) + '</span>'
+          : '<button class="btn btn-primary market-install-btn" data-cmd="' + installCmd + '" type="button">' + htmlEscape(t('modal.market.install')) + '</button>') +
+        (homepage ? '<a class="market-link" data-url="' + homepage + '" href="#">' + htmlEscape(t('modal.market.home')) + '</a>' : '') +
       '</div>' +
     '</div>';
   }).join('');
@@ -4405,6 +4450,12 @@ class SkillsViewProvider {
           if (!incoming || typeof incoming !== 'object') throw new Error('not object');
           // Sanity: refuse anything that doesn't look like our config
           if (!('skills' in incoming) && !('meta' in incoming)) throw new Error('not config');
+          // Defense-in-depth: strip prototype-pollution keys recursively.
+          // JSON.parse already places these as own properties (so they
+          // can't pollute Object.prototype directly), but downstream
+          // dynamic-key access elsewhere is safer if these never enter
+          // memory at all.
+          stripDangerousKeys(incoming);
           userConfig.write(incoming);
           this.refresh();
           for (const v of this.views) {
@@ -4511,7 +4562,7 @@ class SkillsViewProvider {
         userConfig.setCharacterName(msg.name || '');
         clearTimeout(this._buddyRefreshTimer);
         this._buddyRefreshTimer = setTimeout(() => this.refresh(), 200);
-      } else if (msg.type === 'saveConfig' && msg.name) {
+      } else if (msg.type === 'saveConfig' && msg.name && !DANGEROUS_KEYS.has(msg.name)) {
         const cfg = userConfig.read();
         if (!cfg.skills[msg.name]) cfg.skills[msg.name] = {};
         if (msg.alias) cfg.skills[msg.name].alias = msg.alias; else delete cfg.skills[msg.name].alias;
