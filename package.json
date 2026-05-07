@@ -2,7 +2,7 @@
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
   "description": "Manage your Claude Code skills like a game: one-click triggers, right-click edit, per-skill stats and live token usage. Cute pixel buddies fight monsters while Claude works. CLI users → activity bar; IDE users → bottom panel. Free, MIT. EN · 한국어 · 日本語 · 中文.",
-  "version": "0.43.1",
+  "version": "0.44.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",

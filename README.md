@@ -12,7 +12,7 @@
 
 A pixel-art skill launcher for Claude Code. **Click to fire, right-click to edit, watch your buddies fight while you work, see exactly which commands eat your tokens.**
 
-![Buddy lineup — your usage pattern decides which of 10 RPG classes your buddy becomes](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
+![Click to fire — every slash command on your machine, one click away](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/demo-card-click.gif)
 
 ### The five things you actually use it for
 
@@ -127,6 +127,8 @@ Drag your most-used skills to 6 slots and trigger them with number keys. Each sl
 
 ### 🚀 Execution Modes (`▶` button)
 
+![Toggle between Paste and Term modes — and the 💬 prompt button appears in Term mode](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/demo-exec-mode.gif)
+
 | Mode | Behavior |
 |---|---|
 | **▶ Paste** | Copy `/skill` to clipboard only (default — most reliable) |
@@ -135,6 +137,8 @@ Drag your most-used skills to 6 slots and trigger them with number keys. Each sl
 > v0.41 dropped the previous `▶ Auto` mode (osascript / SendKeys / xdotool keystroke automation) — it was unreliable against React-driven inputs in Cursor / VS Code, and `Term` mode covers the same automation use case far more reliably.
 
 ### ✏️ Customization
+
+![Edit modal — alias / note / prompt template / icon / group / hide](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/demo-edit-modal.gif)
 
 - **Alias** — rename any skill with a shorter label
 - **Note** — shown in the hover popover
@@ -216,6 +220,10 @@ Enable **Settings → Buddy actions** and the yard reacts to whether Claude Code
 Works with both the Claude Code CLI and the Claude Code IDE extension — both write to the same `~/.claude/projects/` tree.
 
 ### 🎨 Pixel-art UI
+
+| Theme cycle (Dark / Retro CRT / Gameboy LCD) | Locale switch (EN / 한국어 / 日本語 / 中文) |
+|---|---|
+| ![Theme cycle](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/demo-theme.gif) | ![Locale switch](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/demo-locale.gif) |
 
 - **Pixel fonts**: DotGothic16 (Korean) + Press Start 2P (English)
 - **62 custom spark-style icons** — one per skill category, consistent dark frame

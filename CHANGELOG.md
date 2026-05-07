@@ -2,6 +2,30 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.0] — 2026-05-07
+
+### Added — Demo GIFs throughout the README
+
+The Marketplace listing now leads with a real card-click demo instead of
+a static buddy lineup, and four more GIFs anchor the feature sections
+they describe. The yard / class-skill demo (the most distinctive single
+visual the extension has) lives in the Buddy Yard section.
+
+- **Hero**: `demo-card-click.gif` (882 KB) — every slash command on
+  your machine, one click away.
+- **Customization**: `demo-edit-modal.gif` (425 KB) — edit modal with
+  alias / note / prompt template / icon / group / hide.
+- **Execution Modes**: `demo-exec-mode.gif` (524 KB) — toggling between
+  Paste and Term, with the 💬 prompt button appearing in Term mode.
+- **Pixel-art UI**: `demo-theme.gif` (586 KB) + `demo-locale.gif`
+  (594 KB) side-by-side — theme cycle (Dark / Retro / LCD) and locale
+  switch (EN / 한국어 / 日本語 / 中文).
+
+GIFs live under `docs/screenshots/` and are referenced via raw
+GitHub URLs, so they don't bloat the `.vsix` package (`docs/**` is in
+`.vscodeignore`). Marketplace listing CDN picks them up automatically
+on the next listing refresh after the v0.44.0 tag publishes.
+
 ## [0.43.1] — 2026-05-07
 
 ### Changed — README brought up to date with everything that landed in v0.40-v0.43
