@@ -2,6 +2,30 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.1] — 2026-05-07
+
+### Changed — Preview screenshots refreshed for v0.43+ visuals
+
+The two Preview-section PNGs (`panel-main.png` Activity Bar narrow,
+`panel-bottom.png` Bottom Panel wide) had been frozen on v0.20 captures
+from late April — pre-yard, pre-tokens, pre-prompt-modal, pre-locale-
+toggle, single-theme, Korean-only. They didn't match anything users
+were actually installing.
+
+The new captures show:
+
+- **panel-main.png** — narrow Activity Bar with the buddy yard
+  (pixel forest backdrop + monster + class-specific buddies idle-walking),
+  the prompt-template hint banner, Quick Bar, recent / project / my
+  skills sections all visible at once.
+- **panel-bottom.png** — wide Bottom Panel with the **per-buddy info
+  modal opened** (Webbie / Wizard / 4 invocations / triggers on
+  web/frontend/ui/css/react/tailwind/figma/design / "★ Your current class"
+  badge). Doubles as a feature showcase for the v0.43 buddy info modal.
+
+Same filenames, so the README image references didn't change. No code
+diff — listing-freshness patch only.
+
 ## [0.44.0] — 2026-05-07
 
 ### Added — Demo GIFs throughout the README
