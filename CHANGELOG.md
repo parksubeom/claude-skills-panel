@@ -2,6 +2,35 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.3] — 2026-05-07
+
+### Fixed — Demo GIFs no longer have huge top/bottom padding
+
+The five v0.44 demo GIFs were exported as 800×800 squares with the
+actual panel content packed into the middle ~400px and the top/bottom
+~200px each just black padding. Result: in the README hero, each GIF
+sat in a roughly square-shaped block where most of the visual area
+was empty space — the "where did all this whitespace come from"
+effect users reported.
+
+Re-cropped all five through ffmpeg + gifski:
+
+- `crop=800:400:0:200` — drops the dead top and bottom bands
+- gifski `--quality 80 --fps 24` — preserves clarity, smaller files
+- 800×400 wide aspect = renders inline at proper proportion in the
+  README hero and feature sections
+
+Side benefit: the cropped GIFs are smaller too (avg 33% reduction):
+
+| GIF | Before | After |
+|---|---|---|
+| demo-card-click | 882 KB | 612 KB |
+| demo-edit-modal | 425 KB | 286 KB |
+| demo-exec-mode | 524 KB | 369 KB |
+| demo-locale | 594 KB | 365 KB |
+| demo-theme | 586 KB | 364 KB |
+| **Total** | **3.0 MB** | **2.0 MB** |
+
 ## [0.44.2] — 2026-05-07
 
 ### Changed — Discoverability sweep (keywords + categories + repo metadata)
