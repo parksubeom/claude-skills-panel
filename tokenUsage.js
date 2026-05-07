@@ -237,20 +237,27 @@ function resetActivity() {
 function getStatsFor(commandName) {
   const s = perCommand.get(commandName);
   if (!s) return null;
-  // Strip private set before returning
+  // Strip private set + add the per-run average. Average is the metric
+  // that actually answers "how heavy is this skill" — cumulative just
+  // tracks how often you ran it.
   // eslint-disable-next-line no-unused-vars
   const { _sessions, ...pub } = s;
+  pub.avg = pub.invocations > 0 ? Math.round(pub.total / pub.invocations) : 0;
   return pub;
 }
 
-// All commands sorted by total tokens desc — used by Most tokens sort and
-// by the weekly report's TOP 5 section.
+// All commands sorted by AVERAGE tokens-per-run desc. "Most tokens" means
+// "heaviest per call" which matches user intent ("which skill is the most
+// expensive to run"); ranking by cumulative just rewards frequently-used
+// skills.
 function topByTokens(limit) {
   const arr = [];
   for (const [name, s] of perCommand) {
-    if (s.total > 0) arr.push({ name, ...s });
+    if (s.total > 0 && s.invocations > 0) {
+      arr.push({ name, ...s, avg: Math.round(s.total / s.invocations) });
+    }
   }
-  arr.sort((a, b) => b.total - a.total);
+  arr.sort((a, b) => b.avg - a.avg);
   return typeof limit === 'number' ? arr.slice(0, limit) : arr;
 }
 

@@ -2,6 +2,39 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.6] — 2026-05-07
+
+### Changed — Token tracking now shows AVERAGE per run, not cumulative
+
+The original v0.40 token UI displayed cumulative tokens per skill ("203M
+tokens total"). That answers a useless question — *of course* the skill
+you ran 9 times has more tokens than the one you ran once. The actually
+useful question is "how heavy is this skill **per call**?", and that's
+what users mean when they ask "which skill burns the most tokens?".
+
+Switched to per-run average everywhere:
+
+- **Card label**: was `203M tok` (cumulative). Now `22.6M tok/run` (avg
+  = total ÷ invocations). Locale variants: `22.6M 토큰/회`, `22.6M tok/回`,
+  `22.6M tok/次`.
+- **Most-tokens sort (⚡)**: ranks by `avg`, not cumulative. Heaviest
+  skill per call surfaces first.
+- **Weekly report Top 5**: title rephrased to "Heaviest skills (avg
+  tokens / run)" / "무거운 스킬 TOP 5 (회당 평균)" etc. Each row shows
+  `<avg>/run · <invocations>×`.
+- **Card hover tooltip**: now shows `Avg X tok per run · Y total over
+  Z× invocations` followed by the four-way breakdown
+  (`in · out · cache create · cache read`). Cumulative + breakdown
+  are still visible, just demoted from the headline number.
+
+This explains why the same `/full-flow` reads as `22.6M/run` (heavy
+per call) instead of `203M total` (heavy because used 9 times).
+
+The four token components still get summed straight (`input + output
++ cache_creation + cache_read`) — cost-weighted equivalents
+(`out × 5`, `cache_read × 0.1`, etc) intentionally not applied;
+keeping the metric simple and matching the API's own usage-block sum.
+
 ## [0.44.5] — 2026-05-07
 
 ### Fixed — Token tracking now actually attributes usage to commands

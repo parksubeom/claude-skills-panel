@@ -551,8 +551,8 @@ function renderHtml(webview, skills) {
               data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
               data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
               data-count="${s.usage.count}"
-              data-tokens="${s.tokenStats ? s.tokenStats.total : 0}"
-              data-has-tokens="${s.tokenStats && s.tokenStats.total > 0 ? '1' : '0'}"
+              data-tokens="${s.tokenStats ? s.tokenStats.avg : 0}"
+              data-has-tokens="${s.tokenStats && s.tokenStats.avg > 0 ? '1' : '0'}"
               data-last="${s.usage.lastUsed || ''}"
               data-level="${s.level}"
               data-plugin="${escapeHtml(s.plugin || '')}"
@@ -565,7 +565,7 @@ function renderHtml(webview, skills) {
               <div class="skill-name">${label}</div>
               ${aliased ? `<div class="skill-original">/${original}</div>` : ''}
               ${starsHtml}
-              ${s.tokenStats && s.tokenStats.total > 0 ? `<div class="skill-tokens" title="${escapeHtml(t('card.tokensTitle', { total: s.tokenStats.total.toLocaleString(), invocations: s.tokenStats.invocations, sessions: s.tokenStats.sessions }))}">${t('card.tokens', { tokens: tokenUsage.formatShort(s.tokenStats.total) })}</div>` : ''}
+              ${s.tokenStats && s.tokenStats.avg > 0 ? `<div class="skill-tokens" title="${escapeHtml(t('card.tokensTitle', { avg: tokenUsage.formatShort(s.tokenStats.avg), total: s.tokenStats.total.toLocaleString(), invocations: s.tokenStats.invocations, input: tokenUsage.formatShort(s.tokenStats.input), output: tokenUsage.formatShort(s.tokenStats.output), cacheCreate: tokenUsage.formatShort(s.tokenStats.cacheCreate), cacheRead: tokenUsage.formatShort(s.tokenStats.cacheRead) }))}">${t('card.tokens', { tokens: tokenUsage.formatShort(s.tokenStats.avg) })}</div>` : ''}
               <div class="hover-card">
                 <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
                 <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
@@ -626,8 +626,8 @@ function renderHtml(webview, skills) {
         data-icon-uri="${escapeHtml(userIconUriFor(s) || '')}"
         data-spark-icon="${escapeHtml(s.sparkIcon || '')}"
         data-count="${s.usage.count}"
-        data-tokens="${s.tokenStats ? s.tokenStats.total : 0}"
-        data-has-tokens="${s.tokenStats && s.tokenStats.total > 0 ? '1' : '0'}"
+        data-tokens="${s.tokenStats ? s.tokenStats.avg : 0}"
+        data-has-tokens="${s.tokenStats && s.tokenStats.avg > 0 ? '1' : '0'}"
         data-last="${s.usage.lastUsed || ''}"
         data-level="${s.level}">
         ${lvBadge}
@@ -636,7 +636,7 @@ function renderHtml(webview, skills) {
         ${iconHtml}
         <div class="skill-name">${label}</div>
         ${s.level > 0 ? renderStars(s.level) : '<span class="stars lv0">☆☆☆☆☆</span>'}
-        ${s.tokenStats && s.tokenStats.total > 0 ? `<div class="skill-tokens" title="${escapeHtml(t('card.tokensTitle', { total: s.tokenStats.total.toLocaleString(), invocations: s.tokenStats.invocations, sessions: s.tokenStats.sessions }))}">${t('card.tokens', { tokens: tokenUsage.formatShort(s.tokenStats.total) })}</div>` : ''}
+        ${s.tokenStats && s.tokenStats.avg > 0 ? `<div class="skill-tokens" title="${escapeHtml(t('card.tokensTitle', { avg: tokenUsage.formatShort(s.tokenStats.avg), total: s.tokenStats.total.toLocaleString(), invocations: s.tokenStats.invocations, input: tokenUsage.formatShort(s.tokenStats.input), output: tokenUsage.formatShort(s.tokenStats.output), cacheCreate: tokenUsage.formatShort(s.tokenStats.cacheCreate), cacheRead: tokenUsage.formatShort(s.tokenStats.cacheRead) }))}">${t('card.tokens', { tokens: tokenUsage.formatShort(s.tokenStats.avg) })}</div>` : ''}
         <div class="hover-card">
           <div class="hover-name">${label}${aliased ? ` <span class="hover-alias">/${original}</span>` : ''}</div>
           <div class="hover-desc">${desc || `<i>${t('card.descEmpty')}</i>`}</div>
@@ -3043,7 +3043,7 @@ function renderHtml(webview, skills) {
             <li>
               <span class="rank">#${i + 1}</span>
               <span class="top-name">${escapeHtml(row.label)}</span>
-              <span class="top-count">${t('modal.report.tokensRow', { tokens: tokenUsage.formatShort(row.total), invocations: row.invocations })}</span>
+              <span class="top-count">${t('modal.report.tokensRow', { tokens: tokenUsage.formatShort(row.avg), invocations: row.invocations })}</span>
             </li>
           `).join('')}
         </ol>` : `<div class="report-empty">${t('modal.report.tokensEmpty')}</div>`}
