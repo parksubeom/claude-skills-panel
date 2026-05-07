@@ -284,6 +284,21 @@ See [.github/workflows/publish.yml](.github/workflows/publish.yml) for the full 
 
 ---
 
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=parksubeom/claude-skills-panel&type=Date)](https://star-history.com/#parksubeom/claude-skills-panel&Date)
+
+If this saved you from typing `/full-flow` for the 38th time today, a ⭐ helps other Claude Code users find it.
+
+---
+
+## Translations
+
+- 🇺🇸 **English** (this file)
+- 🇰🇷 [한국어 (README.ko.md)](README.ko.md)
+
+---
+
 ## License
 
 MIT © [parksubeom](https://github.com/parksubeom)

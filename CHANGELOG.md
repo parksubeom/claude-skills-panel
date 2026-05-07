@@ -2,6 +2,37 @@
 
 All notable changes to this extension are documented here.
 
+## [0.44.2] — 2026-05-07
+
+### Changed — Discoverability sweep (keywords + categories + repo metadata)
+
+A meta pass focused on Marketplace search ranking, GitHub repo
+discoverability, and SEO surface area. No code changes.
+
+- **`package.json` keywords**: 29 → 47. Added direct-brand searches
+  (`claude-skills`, `claude-code-skills`, `anthropic-extension`),
+  v0.40 feature surface (`token-tracker`, `token-usage`, `task-monitor`),
+  buddy yard surface (`buddy`, `companion`, `pixel-buddies`,
+  `pixel-game`), and IDE coverage (`windsurf`, `vscodium`,
+  `terminal-companion`, `cli-ui`, `agent-panel`,
+  `slash-command-launcher`).
+- **`package.json` categories**: added `Snippets` (slash commands ARE
+  snippets in spirit; widens search match).
+- **`README.md`**: appended a Star History badge (visual traction
+  signal) and a Translations section linking to the Korean README.
+- **`README.ko.md`** (new): Korean translation of the hero, five
+  use-loops, persona table, dock recommendation, and install table.
+  Targets Korean-language Marketplace + GitHub search directly.
+- **`.github/FUNDING.yml`** (new): adds the GitHub Sponsors button to
+  the repo About panel — small trust signal, occupies otherwise empty
+  panel real estate.
+- **`CONTRIBUTING.md`** (new): project layout, "Adding a new locale"
+  walkthrough, "Adding a buddy class" walkthrough, manual-test
+  checklist. Active-maintainer signal for GitHub algorithm; lowers
+  contribution barrier.
+
+Marketplace freshness patch only.
+
 ## [0.44.1] — 2026-05-07
 
 ### Changed — Preview screenshots refreshed for v0.43+ visuals
