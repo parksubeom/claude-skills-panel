@@ -27,6 +27,7 @@ const perCommand = new Map();   // cmdName -> stats object
 const promptToCmd = new Map();  // promptId -> cmdName
 const fileOffsets = new Map();  // filepath -> last byte processed
 const fileSizes = new Map();    // filepath -> size at last scan (truncation detection)
+let _mostRecentCommand = null;  // Last <command-name> seen in any user line — drives the buddy yard's active fighter selection
 
 function emptyStats() {
   return {
@@ -46,6 +47,11 @@ function reset() {
   promptToCmd.clear();
   fileOffsets.clear();
   fileSizes.clear();
+  _mostRecentCommand = null;
+}
+
+function getMostRecentCommand() {
+  return _mostRecentCommand;
 }
 
 function listSessionFiles() {
@@ -80,6 +86,7 @@ function processLine(line, file) {
     if (m && obj.promptId) {
       const cmd = m[1];
       promptToCmd.set(obj.promptId, cmd);
+      _mostRecentCommand = cmd;
       // Initialize bucket and bump invocation count exactly once per marker
       const stats = perCommand.get(cmd) || emptyStats();
       stats.invocations += 1;
@@ -240,4 +247,5 @@ module.exports = {
   latestMtimeMs,
   getActivityState,
   resetActivity,
+  getMostRecentCommand,
 };

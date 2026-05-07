@@ -1,8 +1,8 @@
 {
   "name": "claude-skills-panel",
   "displayName": "Claude Code Skills Panel",
-  "description": "Stop typing slash commands from memory. Auto-discovers every Claude Code skill, custom command, and plugin on your machine — fire with one click or keys 1–6. Built-in marketplace browser for 243+ plugins. Free, MIT. EN · 한국어 · 日本語 · 中文.",
-  "version": "0.42.0",
+  "description": "Manage your Claude Code skills like a game: one-click triggers, right-click edit, per-skill stats and live token usage. Cute pixel buddies fight monsters while Claude works. CLI users → activity bar; IDE users → bottom panel. Free, MIT. EN · 한국어 · 日本語 · 中文.",
+  "version": "0.43.0",
   "publisher": "parksubeom",
   "license": "MIT",
   "icon": "icon.png",

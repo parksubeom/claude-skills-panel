@@ -2,6 +2,157 @@
 
 All notable changes to this extension are documented here.
 
+## [0.43.0] — 2026-05-07
+
+A polish + game-feel sprint that turned the buddy yard from "buddies
+walk back and forth" into "the buddies and a monster have a real
+side-scroller fight," and tightened a handful of UX papercuts along
+the way.
+
+### Added — Class-specific attack actions
+
+The active fighter now hits the monster in a way that matches its RPG
+class. Each class has a distinct glyph, count, color, and attack type
+(`melee` / `projectile` / `aura`), driven by a single `ATTACK_EFFECTS`
+map and three keyframe animations (`attack-projectile` flies via CSS
+custom properties `--dx` / `--dy` from fighter to monster, `attack-melee`
+flashes at the monster body, `attack-aura` spreads multiple glyphs in
+a small ring).
+
+| Class | Role | Glyph × N | Type |
+|---|---|---|---|
+| codey | Swordsman | ⚔ × 1 | melee |
+| gitto | Ninja | ✦ × 3 | projectile |
+| testra | Paladin | ⚒ × 1 | melee |
+| webbie | Wizard | 🔥 × 1 | projectile |
+| docly | Cleric | ✨ × 5 | aura |
+| debuggo | Detective | 🔍 × 1 | melee |
+| sheety | Merchant | 🪙 × 2 | projectile |
+| slidey | Bard | 🎵 × 3 | projectile |
+| pdfox | Rogue | 🗡 × 4 | projectile |
+| datia | Astrologer | ⭐ × 1 | aura |
+
+### Added — Active fighter selection from the live task
+
+Polling `~/.claude/projects/*.jsonl` mtime already told us *whether*
+Claude Code was busy; v0.43 also captures *which slash command* is
+running. The most recent `<command-name>` marker → `userConfig.classifySkill()`
+→ class id is broadcast with every `buddyActivity` message. The
+matching buddy on the right cluster slides leftward to the monster's
+side and runs its class strike loop; everyone else cheers in place.
+Falls back to the user's locked class, then `codey`, if no command
+has been seen yet.
+
+### Added — Per-buddy info modal
+
+Clicking any sprite in the yard opens a dedicated info modal (sprite,
+name, role, invocation count, trigger keywords, "★ Your current class"
+badge if it matches the locked class). Previously every yard click
+opened the user's own character sheet — same modal regardless of
+which buddy was clicked. Now the character sheet stays for `Click
+buddy → see *that* buddy`.
+
+i18n: 3 new keys × 4 locales (`buddy.info.invocations`, `.triggers`,
+`.currentClass`).
+
+### Added — Buddies cluster on the right; monster on the left
+
+The yard is now staged like a side-scroller: every invoked class
+sprite parks on the right (`right: calc(8px + idx * 22px)`), and the
+monster lives on the left (`left: 12%`). When fighting starts, the
+active fighter overrides its `right` to `left: calc(12% + 38px)` and
+the panel-wide `transition: right 0.55s, left 0.55s` makes the dash
+read as "running over to attack."
+
+### Added — Pink "invader" monster
+
+The single SVG path was replaced with a chunky red Space-Invaders-ish
+cube (12×10 body, two tall dark eye rectangles, three little legs).
+Color is fixed `#ef4444` (was `var(--magenta)`, which collided with
+some theme backgrounds). Slightly bigger (32 → 36px) and with a red
+glow shadow for visibility.
+
+### Added — Optional pixel forest backdrop
+
+If the user drops an image at `assets/buddy-yard-bg.{png,jpg,jpeg,webp,gif}`,
+the yard auto-applies it as a `cover`-fitted background (CSS variable
+`--yard-bg-url` set inline; `.has-bg` class swaps the `background`
+shorthand). Both the inline yard and the modal version pick it up.
+With no file present the v0.42 sky→grass gradient stays unchanged.
+
+### Added — Floating damage numbers + slash effects during fights
+
+While `fighting`, a JS interval (every 850ms) spawns a yellow pixel
+damage number above the monster (5–32, 18% chance crit at 40–100 in
+pink) plus a class-specific attack glyph at the fighter→monster path.
+The damage number floats up 36px and fades; attack glyphs auto-clean
+after 360–520ms.
+
+### Added — On-toggle demo fight
+
+Flipping `Buddy actions` to On now immediately pushes a `busy` →
+`completed` cycle (5 s) so the user can see the feature instead of
+guessing what changed. Demo's active fighter is resolved from
+`getMostRecentCommand()` → falls back to the locked class → `codey`.
+
+### Added — Settings toggle pairs visibly indicate active state
+
+The Enable / Disable button pairs in Settings now apply an `.active`
+class to the currently-on side based on `cfg`. Active button gets
+`var(--accent)` background, glow, and full opacity; the inactive side
+dims to 0.55. Clicking flips the visual instantly (`flipTogglePair`
+helper) before the host refresh roundtrips. No more reading the
+"Currently: …" hint to know which side is the current state — pure
+accessibility win.
+
+### Changed — Toolbar toggle widths are now stable across labels
+
+`.theme-toggle` (`min-width: 86px`), `.locale-toggle` (`min-width: 56px`),
+and `.exec-mode-btn` (`min-width: 92px`) all carry a fixed minimum
+width + `text-align: center` + `white-space: nowrap`. Switching theme
+between Dark / Retro / LCD, locale between EN / KO / JA / ZH, or exec
+mode between Paste / Term no longer resizes the search input next to
+them.
+
+### Changed — README leads with persona-specific dock recommendations
+
+The hero rewrites away from "30+ slash commands" toward five concrete
+use loops users actually run (manage skills like a game, pixel buddies
+fight while Claude works, see usage stats, find token hogs, browse the
+plugin marketplace inside the panel). A new "Where to dock it" table
+recommends the **bottom panel** for users on the Claude Code IDE
+extension and the **activity bar** for users on the Claude Code CLI.
+
+### Changed — `package.json` description rewritten for the same audience
+
+Was: "Stop typing slash commands from memory…"
+Now: "Manage your Claude Code skills like a game: one-click triggers,
+right-click edit, per-skill stats and live token usage. Cute pixel
+buddies fight monsters while Claude works. CLI users → activity bar;
+IDE users → bottom panel."
+
+### Removed — Sort buttons next to the search bar
+
+The `☷ default` / `⏱ recent` / `★ usage` / `⚡ tokens` toolbar controls
+were deleted. In practice users searched by name (or scanned visually
+by group); the sort group consumed valuable header real estate without
+matching usage. Search and the existing group ordering cover the
+remaining navigation needs. CSS, HTML, the `applySort` function, the
+`SORT.mode` state, and the click handlers are all gone (~30 lines).
+
+### Fixed — Theme toggle no longer reflows the search bar
+
+(See toolbar widths above — direct fix for the user-reported "search
+bar resizes when I change theme" jank.)
+
+### Fixed — Monster reliably visible in fighting state
+
+Pre-v0.43 the monster used `var(--magenta)` which on some themes
+overlapped the yard background. Switched to a fixed `#ef4444` red
+with `drop-shadow(0 0 4px rgba(239, 68, 68, 0.65))` glow. The fighting
+class now also sets `transform: translateY(0) scale(1)` (was just
+`translateY(0)` — it kept the entry-state scale of 0.8).
+
 ## [0.42.0] — 2026-05-06
 
 ### Removed — `cmd` badge on slash-command cards

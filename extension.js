@@ -38,6 +38,10 @@ function startBuddyActions() {
   if (!cfg.meta || !cfg.meta.buddyActions) return;
   tokenUsage.resetActivity();
   const tick = () => {
+    // Light scan so getMostRecentCommand() reflects the latest <command-name>
+    // marker — needed to pick the active fighter buddy. Only message.usage
+    // metadata + the marker regex are touched; no prompt body retained.
+    try { tokenUsage.scanAll(); } catch {}
     let snap;
     try { snap = tokenUsage.getActivityState(8000); } catch { return; }
     for (const fn of _buddyActionsListeners) {
@@ -80,7 +84,9 @@ async function dispatchExec(name, mode) {
 
 let PIXEL_MANIFEST = {};
 let PIXEL_DIR = null;
+let ASSETS_DIR = null;
 function loadPixelManifest(extPath) {
+  ASSETS_DIR = path.join(extPath, 'assets');
   PIXEL_DIR = path.join(extPath, 'assets', 'pixel-icons');
   try {
     PIXEL_MANIFEST = JSON.parse(fs.readFileSync(path.join(PIXEL_DIR, 'manifest.json'), 'utf8'));
@@ -637,27 +643,81 @@ function renderHtml(webview, skills) {
     ? yardBuddies.map((b, i) => {
         const uri = yardSpriteUri(b.id);
         if (!uri) return '';
-        const role = t('class.' + b.id + '.role');
-        const name = t('class.' + b.id + '.name');
+        const info = buddyInfoFor(b);
         return `<img class="yard-buddy${extraClass ? ' ' + extraClass : ''}"
           src="${uri}"
-          alt="${escapeHtml(name)}"
-          data-class="${escapeHtml(b.id)}"
-          title="${escapeHtml(name + ' — ' + role + ' · ' + b.count)}"
+          alt="${escapeHtml(info.name)}"
+          data-class="${escapeHtml(info.classId)}"
+          data-sprite="${uri}"
+          data-name="${escapeHtml(info.name)}"
+          data-role="${escapeHtml(info.role)}"
+          data-count="${info.count}"
+          data-triggers="${escapeHtml(info.triggers)}"
+          data-current="${info.isCurrent ? '1' : '0'}"
+          title="${escapeHtml(info.name + ' — ' + info.role + ' · ' + info.count)}"
           style="--idx: ${i}; --total: ${yardBuddies.length}; --delay: ${(i * 0.27).toFixed(2)}s;" />`;
       }).join('')
     : `<div class="yard-empty">${t('buddy.yard.empty')}</div>`;
 
-  // Inline pixel monster — fades in only during fighting state. SVG so we
-  // don't ship a PNG for it; tone shifts via currentColor in CSS.
+  // Trigger keyword summaries per buddy class — shown in the per-buddy
+  // info modal so users can see "what makes my buddy this class".
+  // Strings come straight from userConfig.CATEGORY_RULES regexes, just
+  // rendered human-friendly.
+  const BUDDY_TRIGGER_KEYWORDS = {
+    codey:   'code, refactor, simpl, implement, build, compile',
+    docly:   'doc, write, markdown, readme, note',
+    debuggo: 'debug, bug, fix, trace, stacktrace, logs',
+    testra:  'test, spec, verify, check, review, audit',
+    sheety:  'xlsx, csv, sheet, excel, table, tsv',
+    slidey:  'slide, pptx, present, pitch, keynote',
+    pdfox:   'pdf',
+    webbie:  'web, frontend, ui, css, react, tailwind, figma, design',
+    datia:   'analyze, chart, viz, visualize, metric, dashboard, stats',
+    gitto:   'git, commit, branch, push, pr, merge, rebase',
+  };
+
+  // Inline pixel monster — fades in only during fighting state. Modeled
+  // after the classic Space-Invaders-ish red cube the user referenced:
+  // chunky body, two tall dark eyes, and three little legs.
   const monsterSvg = `<svg class="yard-monster" viewBox="0 0 16 16" aria-hidden="true">
-    <path fill="currentColor" d="M3 9 h1 v-1 h1 v-1 h1 v-1 h4 v1 h1 v1 h1 v1 h1 v3 h-1 v1 h-9 v-1 h-1 z M5 8 h1 v1 h-1 z M10 8 h1 v1 h-1 z" />
-    <path fill="currentColor" opacity="0.5" d="M2 13 h12 v1 h-12 z" />
+    <rect x="2" y="2" width="12" height="10" fill="currentColor" />
+    <rect x="4" y="5" width="2" height="4" fill="#1a0606" />
+    <rect x="10" y="5" width="2" height="4" fill="#1a0606" />
+    <rect x="3" y="12" width="2" height="2" fill="currentColor" />
+    <rect x="7" y="12" width="2" height="2" fill="currentColor" />
+    <rect x="11" y="12" width="2" height="2" fill="currentColor" />
   </svg>`;
+
+  // Optional pixel forest backdrop. If the user drops an image at
+  // `assets/buddy-yard-bg.{png,jpg,jpeg,webp}`, it gets used as a
+  // `cover`-fitted background. Otherwise the existing gradient +
+  // grass-dot pattern stays — no breakage if the file is missing.
+  const yardBgUri = (() => {
+    if (!ASSETS_DIR) return null;
+    const candidates = ['png', 'jpg', 'jpeg', 'webp', 'gif']
+      .map((ext) => path.join(ASSETS_DIR, `buddy-yard-bg.${ext}`));
+    const found = candidates.find((p) => fs.existsSync(p));
+    if (!found) return null;
+    return webview.asWebviewUri(vscode.Uri.file(found)).toString();
+  })();
+  const yardBgStyle = yardBgUri ? ` style="--yard-bg-url: url('${yardBgUri}');"` : '';
+  const yardBgClass = yardBgUri ? ' has-bg' : '';
+
+  // Per-buddy info data for the info modal. Each yard buddy attaches its
+  // own data-* payload so the click handler can read it without another
+  // lookup table on the webview side.
+  const buddyInfoFor = (b) => ({
+    classId: b.id,
+    name: t('class.' + b.id + '.name'),
+    role: t('class.' + b.id + '.role'),
+    count: b.count,
+    triggers: BUDDY_TRIGGER_KEYWORDS[b.id] || '',
+    isCurrent: character.class === b.id,
+  });
 
   const buddyYardHtml = `
     <div class="buddy-yard-wrap">
-      <div class="buddy-yard" id="buddy-yard" title="${t('buddy.yard.title')}" data-buddy-state="idle">
+      <div class="buddy-yard${yardBgClass}" id="buddy-yard" title="${t('buddy.yard.title')}" data-buddy-state="idle"${yardBgStyle}>
         ${monsterSvg}
         ${yardBuddyImgs()}
       </div>
@@ -670,11 +730,37 @@ function renderHtml(webview, skills) {
     <div class="modal-bg" id="buddy-yard-modal-bg">
       <div class="modal modal-wide buddy-yard-modal">
         <h4>${t('buddy.yard.title')}</h4>
-        <div class="buddy-yard buddy-yard-modal-inner">
+        <div class="buddy-yard buddy-yard-modal-inner${yardBgClass}"${yardBgStyle}>
           ${yardBuddyImgs('big')}
         </div>
         <div class="modal-actions">
           <button class="btn" id="buddy-yard-modal-close">${t('modal.edit.cancel')}</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Per-buddy info modal — opened by clicking any sprite in the yard.
+  // Shows the clicked buddy's class details (not the user's own current
+  // class, which the character sheet handles).
+  const buddyInfoModalHtml = `
+    <div class="modal-bg" id="buddy-info-modal-bg" style="z-index: 280;">
+      <div class="modal buddy-info-modal">
+        <div class="buddy-info-hero">
+          <img id="buddy-info-sprite" src="" alt="" />
+          <div class="buddy-info-headline">
+            <h4 id="buddy-info-name"></h4>
+            <div class="buddy-info-role" id="buddy-info-role"></div>
+            <div class="buddy-info-current" id="buddy-info-current" hidden>${t('buddy.info.currentClass')}</div>
+          </div>
+        </div>
+        <dl class="buddy-info-rows">
+          <dt>${t('buddy.info.invocations')}</dt>
+          <dd id="buddy-info-count"></dd>
+          <dt>${t('buddy.info.triggers')}</dt>
+          <dd id="buddy-info-triggers" class="buddy-info-triggers"></dd>
+        </dl>
+        <div class="modal-actions">
+          <button class="btn" id="buddy-info-close">${t('modal.edit.cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -1191,6 +1277,10 @@ function renderHtml(webview, skills) {
     cursor: default;
     image-rendering: pixelated;
   }
+  /* When assets/buddy-yard-bg.png is present, swap to that image (cover) */
+  .buddy-yard.has-bg {
+    background: var(--yard-bg-url) center / cover no-repeat #87ceeb;
+  }
   .yard-buddy {
     position: absolute;
     bottom: 6px;
@@ -1199,19 +1289,32 @@ function renderHtml(webview, skills) {
     image-rendering: pixelated;
     transform-origin: 50% 100%;
     cursor: pointer;
-    /* Spread evenly across width: idx of total */
-    left: calc(((var(--idx) + 1) / (var(--total) + 1)) * 100% - 14px);
-    animation: yard-walk 2.6s ease-in-out infinite;
+    /* Buddies cluster on the RIGHT side of the yard. The active fighter
+       reposition leftward (next to the monster) when fighting starts —
+       the position transition makes the move read as "running over". */
+    right: calc(8px + var(--idx) * 22px);
+    left: auto;
+    animation: yard-walk 3.4s ease-in-out infinite;
     animation-delay: var(--delay, 0s);
-    transition: filter 0.12s;
+    transition: filter 0.12s, right 0.55s cubic-bezier(.4,0,.2,1), left 0.55s cubic-bezier(.4,0,.2,1);
+    will-change: transform, left, right;
   }
   .yard-buddy:hover { filter: drop-shadow(0 0 4px var(--accent)); }
   .yard-buddy.big { width: 48px; height: 48px; bottom: 12px; }
+  /* Idle walk — translateX (left/right) + translateY (bob/hop) + slight
+     rotation for liveliness. Each buddy carries its own --delay so the
+     yard never looks synchronised. Mid-cycle scaleX flip turns them
+     around so they appear to walk back. */
   @keyframes yard-walk {
-    0%, 100% { transform: translateX(-10px); }
-    49%      { transform: translateX(10px); }
-    50%      { transform: translateX(10px) scaleX(-1); }
-    99%      { transform: translateX(-10px) scaleX(-1); }
+    0%   { transform: translate(-12px, 0) rotate(-2deg); }
+    20%  { transform: translate(-6px, -3px) rotate(2deg); }
+    40%  { transform: translate(6px, 0) rotate(-1deg); }
+    48%  { transform: translate(12px, -2px) rotate(1deg); }
+    50%  { transform: translate(12px, -2px) rotate(1deg) scaleX(-1); }
+    60%  { transform: translate(6px, 0) rotate(-1deg) scaleX(-1); }
+    78%  { transform: translate(-6px, -3px) rotate(2deg) scaleX(-1); }
+    98%  { transform: translate(-12px, 0) rotate(-2deg) scaleX(-1); }
+    100% { transform: translate(-12px, 0) rotate(-2deg); }
   }
   .yard-empty {
     text-align: center;
@@ -1247,25 +1350,69 @@ function renderHtml(webview, skills) {
     margin: 4px 0 12px;
   }
 
+  /* Per-buddy info modal */
+  .buddy-info-modal { width: 320px; }
+  .buddy-info-hero {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .buddy-info-hero img {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
+  }
+  .buddy-info-headline { flex: 1; min-width: 0; }
+  .buddy-info-headline h4 { margin: 0 0 4px 0; color: var(--accent-2); font-size: 14px; }
+  .buddy-info-role { font-size: 11px; color: var(--accent); letter-spacing: 0.4px; }
+  .buddy-info-current {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 9px;
+    padding: 2px 6px;
+    border: 1px solid var(--good);
+    color: var(--good);
+    letter-spacing: 0.4px;
+  }
+  .buddy-info-rows {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 12px;
+    margin: 0 0 12px 0;
+    padding: 10px;
+    background: var(--frame-strong);
+    border: 1px solid var(--frame);
+    font-size: 11px;
+  }
+  .buddy-info-rows dt { color: var(--muted); letter-spacing: 0.3px; }
+  .buddy-info-rows dd { margin: 0; color: var(--fg); word-break: break-word; }
+  .buddy-info-triggers { font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace; font-size: 10px; }
+
   /* Monster — visible only during fighting state. The buddies "fight" it
      with their existing yard-walk animation; on completion it fades and
      ✓! bubbles spawn above the buddies. */
   .yard-monster {
     position: absolute;
-    right: 12%;
+    /* Monster lives on the LEFT now — the buddies are clustered on
+       the right and the active fighter dashes leftward to attack. */
+    left: 12%;
     bottom: 6px;
-    width: 26px;
-    height: 26px;
-    color: var(--magenta, #ec4899);
+    width: 36px;
+    height: 36px;
+    /* Classic invader red. Stays readable on every theme background. */
+    color: #ef4444;
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px) scale(0.8);
     transition: opacity 0.4s ease, transform 0.4s ease;
     image-rendering: pixelated;
     pointer-events: none;
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.65));
   }
   .buddy-yard.fighting .yard-monster {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     animation: monster-shake 0.45s ease-in-out infinite;
   }
   .buddy-yard.completed .yard-monster {
@@ -1277,24 +1424,112 @@ function renderHtml(webview, skills) {
     25%      { transform: translate(-2px, -1px); }
     75%      { transform: translate(2px, 1px); }
   }
-  /* Fighting tone — vignette + slight darkening so the mode is unmistakable.
-     Buddies dash 1.4× faster + scale up briefly on each cycle. */
+  /* Fighting state — full side-scroller energy. The vignette darkens the
+     scene; buddies cycle through wind-up → lunge → impact → recoil → reset
+     with a slight rotation so the action reads even at 28px sprite size.
+     Damage numbers spawn dynamically (see startYardDamage in webview JS). */
   .buddy-yard.fighting::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at right, rgba(236,72,153,0.18), transparent 60%);
+    background:
+      radial-gradient(ellipse at right, rgba(244, 114, 182, 0.22), transparent 65%),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0%, transparent 30%);
     pointer-events: none;
   }
+  /* Default fighting behavior: cheer in place. The active fighter (the
+     class matching the current task) overrides this with a real strike. */
   .buddy-yard.fighting .yard-buddy {
-    animation: yard-dash 1.6s ease-in-out infinite;
+    animation: yard-cheer 0.9s ease-in-out infinite;
     animation-delay: var(--delay, 0s);
   }
-  @keyframes yard-dash {
-    0%, 100% { transform: translateX(-8px) scale(1); }
-    40%      { transform: translateX(14px) scale(1.08); }
-    50%      { transform: translateX(14px) scale(1.08) scaleX(-1); }
-    90%      { transform: translateX(-8px) scale(1) scaleX(-1); }
+  @keyframes yard-cheer {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px) scale(1.05); }
+  }
+  /* Active fighter: rushes from the right cluster to the monster's side
+     (left: 18% — just to the monster's right). Then plays a tight strike
+     loop until the task ends. */
+  .buddy-yard.fighting .yard-buddy.active-fighter {
+    right: auto !important;
+    left: calc(12% + 38px);
+    animation: yard-strike 0.65s ease-in-out infinite;
+    z-index: 3;
+  }
+  @keyframes yard-strike {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    18%  { transform: translate(8px, -2px) rotate(8deg); }            /* wind-up: lean back */
+    42%  { transform: translate(-12px, -4px) rotate(-18deg) scale(1.15); }  /* lunge */
+    52%  { transform: translate(-16px, -1px) rotate(-24deg) scale(1.22); }  /* impact */
+    66%  { transform: translate(-6px, 0) rotate(-8deg) scale(1.05); }      /* recoil */
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+  /* Floating damage numbers above the monster — spawned on a JS timer
+     while fighting is active. */
+  .yard-damage {
+    position: absolute;
+    font-family: 'Press Start 2P', 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fef08a;
+    text-shadow:
+      0 0 4px #f59e0b,
+      1px 1px 0 #000,
+      -1px -1px 0 #000,
+      1px -1px 0 #000,
+      -1px 1px 0 #000;
+    pointer-events: none;
+    user-select: none;
+    transform: translate(-50%, 0);
+    animation: damage-float 0.95s ease-out forwards;
+    z-index: 5;
+  }
+  .yard-damage.crit { color: #fda4af; font-size: 15px; }
+  @keyframes damage-float {
+    0%   { opacity: 0; transform: translate(-50%, 4px) scale(0.5); }
+    18%  { opacity: 1; transform: translate(-50%, -8px) scale(1.35); }
+    35%  { opacity: 1; transform: translate(-50%, -16px) scale(1.05); }
+    100% { opacity: 0; transform: translate(-50%, -36px) scale(0.95); }
+  }
+  /* Class-specific attack glyphs. Three flavors:
+       projectile → flies from the fighter to the monster (CSS vars --dx/--dy)
+       melee      → flashes right at the monster body
+       aura       → spreads multiple glyphs around the monster body */
+  .yard-attack {
+    position: absolute;
+    font-size: 14px;
+    pointer-events: none;
+    user-select: none;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    text-shadow: 0 0 6px currentColor;
+    will-change: transform, opacity;
+  }
+  .yard-attack.projectile {
+    animation: attack-projectile 0.5s ease-out forwards;
+  }
+  @keyframes attack-projectile {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6) rotate(-15deg); }
+    20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(20deg); }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1.3) rotate(360deg); }
+  }
+  .yard-attack.melee {
+    font-size: 18px;
+    animation: attack-melee 0.36s ease-out forwards;
+  }
+  @keyframes attack-melee {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-40deg); }
+    50%  { opacity: 1; transform: translate(-50%, -50%) scale(1.6) rotate(20deg); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1) rotate(60deg); }
+  }
+  .yard-attack.aura {
+    font-size: 13px;
+    animation: attack-aura 0.5s ease-out forwards;
+  }
+  @keyframes attack-aura {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+    35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9) translateY(-10px); }
   }
   /* Completion celebration — buddies pulse once, ✓! bubble floats up. */
   .buddy-yard.completed .yard-buddy {
@@ -1360,21 +1595,6 @@ function renderHtml(webview, skills) {
   }
   body[data-tpl-active="1"] .tpl-mode-banner { display: block; }
 
-  .sort-group { display: flex; gap: 2px; }
-  .sort-btn {
-    all: unset;
-    cursor: pointer;
-    width: 24px; height: 24px;
-    border: 2px solid var(--frame);
-    background: var(--tile-bg);
-    color: var(--muted);
-    text-align: center;
-    line-height: 20px;
-    font-size: 12px;
-    transition: all 0.1s;
-  }
-  .sort-btn:hover { color: var(--accent); border-color: var(--accent); }
-  .sort-btn.active { color: var(--accent-2); border-color: var(--accent-2); background: var(--frame-strong); }
   .recent-group { margin-bottom: 22px; }
   .recent-group .grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
   /* Quick bar */
@@ -1642,6 +1862,9 @@ function renderHtml(webview, skills) {
     transition: all 0.1s;
     flex-shrink: 0;
     white-space: nowrap;
+    /* Stable width across modes — paste vs ▶💬 Term differ in length */
+    min-width: 92px;
+    box-sizing: border-box;
   }
   .exec-mode-btn:hover { border-color: var(--accent); }
   .exec-mode-btn.mode-paste {
@@ -2158,6 +2381,28 @@ function renderHtml(webview, skills) {
     margin-top: 8px;
   }
 
+  /* Settings modal toggle pairs (Enable / Disable). The selected side gets
+     a clear visual difference so users don't have to read the status line
+     below to know which button is the current state — pure accessibility
+     win. Inactive side stays dimmed but still clickable. */
+  .toggle-group { display: flex; gap: 8px; }
+  .toggle-btn {
+    flex: 0 0 auto;
+    min-width: 80px;
+    opacity: 0.55;
+    transition: opacity 0.12s, background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+  }
+  .toggle-btn:hover { opacity: 0.85; }
+  .toggle-btn.active {
+    opacity: 1;
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px var(--accent), inset 0 0 0 1px var(--bg);
+    cursor: default;
+  }
+  .toggle-btn.active:hover { opacity: 1; }
+
   /* Theme toggle button */
   .theme-toggle {
     background: transparent;
@@ -2167,6 +2412,12 @@ function renderHtml(webview, skills) {
     cursor: pointer;
     font-family: inherit;
     font-size: 10px;
+    /* Stable width across themes — without this the search input next to
+       it visibly resizes when toggling Dark / Retro / LCD. Width is sized
+       for the longest label ("🎨 Retro"). */
+    min-width: 86px;
+    text-align: center;
+    white-space: nowrap;
   }
   .theme-toggle:hover { border-color: var(--accent); color: var(--accent-2); }
 
@@ -2266,6 +2517,10 @@ function renderHtml(webview, skills) {
     cursor: pointer;
     padding: 2px 6px;
     border-radius: 3px;
+    /* Stable width — locale codes are all 2 chars but pad ensures parity */
+    min-width: 56px;
+    text-align: center;
+    white-space: nowrap;
   }
   .locale-toggle:hover { border-color: var(--accent); }
   .spark-preset-grid {
@@ -2397,12 +2652,6 @@ function renderHtml(webview, skills) {
       <span class="bracket-r">]</span>
     </div>
     <div class="toolbar-buttons">
-      <div class="sort-group" role="tablist" aria-label="${t('toolbar.sort')}">
-        <button class="sort-btn active" data-sort="default" title="${t('toolbar.sortDefault')}">☷</button>
-        <button class="sort-btn" data-sort="recent" title="${t('toolbar.sortRecent')}">⏱</button>
-        <button class="sort-btn" data-sort="usage" title="${t('toolbar.sortUsage')}">★</button>
-        ${trackTokens ? `<button class="sort-btn" data-sort="tokens" title="${t('toolbar.sortTokens')}">⚡</button>` : ''}
-      </div>
       <button class="meta-btn" id="achv-btn" title="${t('toolbar.achievements')}">🏆</button>
       <button class="meta-btn" id="report-btn" title="${t('toolbar.weeklyReport')}">📊</button>
       <button class="meta-btn" id="groups-btn" title="${t('toolbar.groups')}">📁</button>
@@ -2519,6 +2768,7 @@ function renderHtml(webview, skills) {
   </div>
 
   ${buddyYardModalHtml}
+  ${buddyInfoModalHtml}
 
   <div class="modal-bg" id="groups-bg">
     <div class="modal">
@@ -2585,27 +2835,27 @@ function renderHtml(webview, skills) {
       <div class="settings-section">
         <label>${t('modal.settings.telemetry')}</label>
         <div class="hint">${t('modal.settings.telemetryHint')}</div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" data-telemetry="on" id="tlm-on">${t('modal.settings.telemetryOn')}</button>
-          <button class="btn" data-telemetry="off" id="tlm-off">${t('modal.settings.telemetryOff')}</button>
+        <div class="toggle-group">
+          <button class="btn toggle-btn${(cfg.meta && cfg.meta.telemetry === 'on') ? ' active' : ''}" data-telemetry="on" id="tlm-on">${t('modal.settings.telemetryOn')}</button>
+          <button class="btn toggle-btn${(!cfg.meta || cfg.meta.telemetry !== 'on') ? ' active' : ''}" data-telemetry="off" id="tlm-off">${t('modal.settings.telemetryOff')}</button>
         </div>
         <div class="hint" id="tlm-status" style="margin-top:4px;"></div>
       </div>
       <div class="settings-section">
         <label>${t('modal.settings.tokens')}</label>
         <div class="hint">${t('modal.settings.tokensHint')}</div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" data-tokens="on" id="tok-on">${t('modal.settings.tokensOn')}</button>
-          <button class="btn" data-tokens="off" id="tok-off">${t('modal.settings.tokensOff')}</button>
+        <div class="toggle-group">
+          <button class="btn toggle-btn${trackTokens ? ' active' : ''}" data-tokens="on" id="tok-on">${t('modal.settings.tokensOn')}</button>
+          <button class="btn toggle-btn${!trackTokens ? ' active' : ''}" data-tokens="off" id="tok-off">${t('modal.settings.tokensOff')}</button>
         </div>
         <div class="hint" id="tok-status" style="margin-top:4px;">${t('modal.settings.tokensCurrent', { value: trackTokens ? t('modal.settings.tokensOn') : t('modal.settings.tokensOff') })}</div>
       </div>
       <div class="settings-section">
         <label>${t('modal.settings.buddyActions')}</label>
         <div class="hint">${t('modal.settings.buddyActionsHint')}</div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" data-buddyactions="on" id="bact-on">${t('modal.settings.buddyActionsOn')}</button>
-          <button class="btn" data-buddyactions="off" id="bact-off">${t('modal.settings.buddyActionsOff')}</button>
+        <div class="toggle-group">
+          <button class="btn toggle-btn${(cfg.meta && cfg.meta.buddyActions) ? ' active' : ''}" data-buddyactions="on" id="bact-on">${t('modal.settings.buddyActionsOn')}</button>
+          <button class="btn toggle-btn${!(cfg.meta && cfg.meta.buddyActions) ? ' active' : ''}" data-buddyactions="off" id="bact-off">${t('modal.settings.buddyActionsOff')}</button>
         </div>
         <div class="hint" id="bact-status" style="margin-top:4px;">${t('modal.settings.buddyActionsCurrent', { value: (cfg.meta && cfg.meta.buddyActions) ? t('modal.settings.buddyActionsOn') : t('modal.settings.buddyActionsOff') })}</div>
       </div>
@@ -2968,11 +3218,42 @@ if (buddyYardBtnEl && buddyYardModalBg) {
   const closeBtn = document.getElementById('buddy-yard-modal-close');
   if (closeBtn) closeBtn.addEventListener('click', () => buddyYardModalBg.classList.remove('show'));
 }
+// Per-buddy info modal — clicking any yard sprite shows that specific
+// buddy's class info (sprite, role, invocation count, trigger keywords,
+// "current class" badge if it matches the user's locked class).
+const buddyInfoModalBg = document.getElementById('buddy-info-modal-bg');
+const buddyInfoSprite = document.getElementById('buddy-info-sprite');
+const buddyInfoName = document.getElementById('buddy-info-name');
+const buddyInfoRole = document.getElementById('buddy-info-role');
+const buddyInfoCount = document.getElementById('buddy-info-count');
+const buddyInfoTriggers = document.getElementById('buddy-info-triggers');
+const buddyInfoCurrent = document.getElementById('buddy-info-current');
+function openBuddyInfo(el) {
+  if (!buddyInfoModalBg) return;
+  buddyInfoSprite.src = el.dataset.sprite || el.src;
+  buddyInfoSprite.alt = el.dataset.name || '';
+  buddyInfoName.textContent = el.dataset.name || '';
+  buddyInfoRole.textContent = el.dataset.role || '';
+  buddyInfoCount.textContent = el.dataset.count || '0';
+  buddyInfoTriggers.textContent = el.dataset.triggers || '';
+  if (buddyInfoCurrent) buddyInfoCurrent.hidden = el.dataset.current !== '1';
+  buddyInfoModalBg.classList.add('show');
+  sfxOpen();
+}
+function closeBuddyInfo() { if (buddyInfoModalBg) buddyInfoModalBg.classList.remove('show'); }
+if (buddyInfoModalBg) {
+  buddyInfoModalBg.addEventListener('click', (e) => {
+    if (e.target === buddyInfoModalBg) closeBuddyInfo();
+  });
+  const closeBtn = document.getElementById('buddy-info-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeBuddyInfo);
+}
+
 document.querySelectorAll('.yard-buddy').forEach((b) => {
-  b.addEventListener('click', () => {
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (buddyYardModalBg) buddyYardModalBg.classList.remove('show');
-    buddyBg.classList.add('show');
-    sfxOpen();
+    openBuddyInfo(b);
   });
 });
 
@@ -2980,7 +3261,107 @@ document.querySelectorAll('.yard-buddy').forEach((b) => {
 // mtime polling. Toggles fighting/completed CSS classes on every yard
 // instance (inline + modal), spawns a "✓!" bubble per buddy on
 // completion, and rings the 3-tone chime + toast.
-function handleBuddyActivity(state) {
+
+// Per-class attack signature. Each entry decides how the active fighter
+// hurts the monster: glyph used for the visible effect, how many spawn
+// per attack tick, color, and whether the effect is a flying projectile
+// (ranged) or an impact at the monster (melee/aura).
+//   type 'projectile' → spawns at fighter's position, flies leftward to monster
+//   type 'melee'      → spawns AT monster body (close-range strike)
+//   type 'aura'       → spawns multiple glyphs spread around the monster
+const ATTACK_EFFECTS = {
+  codey:   { glyph: '⚔', count: 1, color: '#fbbf24', type: 'melee' },     // Swordsman — sword swing
+  gitto:   { glyph: '✦', count: 3, color: '#cbd5e1', type: 'projectile' }, // Ninja — shuriken volley
+  testra:  { glyph: '⚒', count: 1, color: '#a78bfa', type: 'melee' },      // Paladin — hammer stamp
+  webbie:  { glyph: '🔥', count: 1, color: '#f97316', type: 'projectile' }, // Wizard — fireball
+  docly:   { glyph: '✨', count: 5, color: '#fef08a', type: 'aura' },       // Cleric — divine light
+  debuggo: { glyph: '🔍', count: 1, color: '#60a5fa', type: 'melee' },     // Detective — magnify pulse
+  sheety:  { glyph: '🪙', count: 2, color: '#fbbf24', type: 'projectile' }, // Merchant — coin toss
+  slidey:  { glyph: '🎵', count: 3, color: '#f472b6', type: 'projectile' }, // Bard — note volley
+  pdfox:   { glyph: '🗡', count: 4, color: '#cbd5e1', type: 'projectile' }, // Rogue — dagger barrage
+  datia:   { glyph: '⭐', count: 1, color: '#c084fc', type: 'aura' },       // Astrologer — star spell
+};
+const DEFAULT_ATTACK = ATTACK_EFFECTS.codey;
+
+let _yardCombatTimer = null;
+function startYardCombat() {
+  if (_yardCombatTimer) return;
+  // First impact happens almost immediately; subsequent every 700-1100ms
+  spawnCombatTick();
+  _yardCombatTimer = setInterval(spawnCombatTick, 850);
+}
+function stopYardCombat() {
+  if (_yardCombatTimer) { clearInterval(_yardCombatTimer); _yardCombatTimer = null; }
+}
+function spawnCombatTick() {
+  document.querySelectorAll('.buddy-yard.fighting').forEach((yard) => {
+    const monster = yard.querySelector('.yard-monster');
+    if (!monster) return;
+    const yardRect = yard.getBoundingClientRect();
+    const mRect = monster.getBoundingClientRect();
+    const mx = mRect.left - yardRect.left + mRect.width / 2;
+    const my = mRect.top - yardRect.top;
+    // Damage number above the monster
+    const isCrit = Math.random() < 0.18;
+    const dmg = document.createElement('span');
+    dmg.className = 'yard-damage' + (isCrit ? ' crit' : '');
+    dmg.textContent = isCrit
+      ? String(40 + Math.floor(Math.random() * 60))
+      : String(5 + Math.floor(Math.random() * 28));
+    dmg.style.left = (mx + (Math.random() * 16 - 8)) + 'px';
+    dmg.style.top = (my - 4) + 'px';
+    yard.appendChild(dmg);
+    setTimeout(() => dmg.remove(), 1000);
+    // Class-specific attack effect
+    const fighter = yard.querySelector('.yard-buddy.active-fighter');
+    const cls = fighter && fighter.dataset.class;
+    const effect = (cls && ATTACK_EFFECTS[cls]) || DEFAULT_ATTACK;
+    spawnClassAttack(yard, effect, fighter, mx, my, mRect);
+  });
+}
+function spawnClassAttack(yard, effect, fighter, mx, my, mRect) {
+  const yardRect = yard.getBoundingClientRect();
+  let fx = mx, fy = my;
+  if (fighter) {
+    const fRect = fighter.getBoundingClientRect();
+    fx = fRect.left - yardRect.left + fRect.width / 2;
+    fy = fRect.top - yardRect.top + fRect.height / 2;
+  }
+  for (let i = 0; i < effect.count; i++) {
+    setTimeout(() => {
+      const el = document.createElement('span');
+      el.className = 'yard-attack ' + effect.type;
+      el.textContent = effect.glyph;
+      el.style.color = effect.color;
+      if (effect.type === 'projectile') {
+        // Start at the fighter, animate to the monster via CSS variables
+        el.style.left = fx + 'px';
+        el.style.top = fy + 'px';
+        const dx = mx - fx;
+        const dy = my + mRect.height * 0.4 - fy;
+        el.style.setProperty('--dx', dx + 'px');
+        el.style.setProperty('--dy', dy + 'px');
+        yard.appendChild(el);
+        setTimeout(() => el.remove(), 520);
+      } else if (effect.type === 'aura') {
+        // Spread glyphs in a small ring around the monster
+        const angle = (i / effect.count) * Math.PI * 2 + Math.random() * 0.4;
+        const rad = 18 + Math.random() * 8;
+        el.style.left = (mx + Math.cos(angle) * rad) + 'px';
+        el.style.top = (my + Math.sin(angle) * rad) + 'px';
+        yard.appendChild(el);
+        setTimeout(() => el.remove(), 520);
+      } else {
+        // melee — strike right at the monster body
+        el.style.left = (mx + (Math.random() * 14 - 7)) + 'px';
+        el.style.top = (my + mRect.height * 0.3) + 'px';
+        yard.appendChild(el);
+        setTimeout(() => el.remove(), 360);
+      }
+    }, i * 110);
+  }
+}
+function handleBuddyActivity(state, activeClass) {
   const yards = [
     document.getElementById('buddy-yard'),
     document.querySelector('.buddy-yard-modal-inner'),
@@ -2991,6 +3372,15 @@ function handleBuddyActivity(state) {
     if (state === 'busy') y.classList.add('fighting');
     if (state === 'completed') y.classList.add('completed');
   }
+  // Active fighter — only the buddy whose class matches the current task
+  // gets the .active-fighter decoration (the one that actually dashes to
+  // the monster). Everyone else cheers in place.
+  document.querySelectorAll('.yard-buddy').forEach((b) => {
+    const isActive = state === 'busy' && activeClass && b.dataset.class === activeClass;
+    b.classList.toggle('active-fighter', !!isActive);
+  });
+  if (state === 'busy') startYardCombat();
+  else stopYardCombat();
   if (state === 'completed') {
     sfxComplete();
     showToast(t('toast.taskComplete'));
@@ -3360,7 +3750,7 @@ window.addEventListener('message', (e) => {
   if (m && m.type === 'showWeeklyReport') reportBg.classList.add('show');
   if (m && m.type === 'toast' && m.key) showToast(t(m.key, m.vars));
   if (m && m.type === 'buddyActivity' && (m.state === 'idle' || m.state === 'busy' || m.state === 'completed')) {
-    handleBuddyActivity(m.state);
+    handleBuddyActivity(m.state, m.activeClass || null);
   }
   if (m && m.type === 'marketplaceCatalog') {
     marketCatalog = m.catalog || { marketplaces: [], plugins: [] };
@@ -3475,38 +3865,9 @@ function showAchvToast(a) {
   }, 2400);
 }
 
-// Sort
-const SORT = { mode: STATE.sort || 'default' };
-function applySort() {
-  const mode = SORT.mode;
-  document.querySelectorAll('.sort-btn').forEach((b) => b.classList.toggle('active', b.dataset.sort === mode));
-  document.querySelectorAll('.group:not(.recent-group):not(.hidden-group) .grid').forEach((grid) => {
-    const cards = [...grid.querySelectorAll('.skill')];
-    cards.sort((a, b) => {
-      if (mode === 'recent') {
-        return (b.dataset.last || '').localeCompare(a.dataset.last || '');
-      }
-      if (mode === 'usage') {
-        return parseInt(b.dataset.count || '0', 10) - parseInt(a.dataset.count || '0', 10);
-      }
-      if (mode === 'tokens') {
-        return parseInt(b.dataset.tokens || '0', 10) - parseInt(a.dataset.tokens || '0', 10);
-      }
-      return a.dataset.name.localeCompare(b.dataset.name);
-    });
-    cards.forEach((c) => grid.appendChild(c));
-  });
-}
-document.querySelectorAll('.sort-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    SORT.mode = btn.dataset.sort;
-    STATE.sort = SORT.mode;
-    saveState();
-    sfxClick();
-    applySort();
-  });
-});
-applySort();
+// (Sort buttons removed in v0.43 — recent/usage/tokens columns lived
+//  under a sort-group next to the search bar but were rarely used.
+//  Search + scroll covers the remaining navigation needs.)
 
 // ---- Quick Bar interactions ----
 function triggerSkill(name, file, opts) {
@@ -3913,22 +4274,35 @@ function refreshTlmStatus() {
   const el = document.getElementById('tlm-status');
   if (el) el.textContent = t('modal.settings.telemetryCurrent', { value: STR['modal.settings.telemetry' + (window.__telemetry === 'on' ? 'On' : 'Off')] || (window.__telemetry || 'unset') });
 }
+// Toggle pairs — flip .active class instantly for snappy feedback while
+// the host refresh roundtrips. Once the host re-renders the modal, the
+// initial active state is reapplied from cfg, which will match.
+function flipTogglePair(onEl, offEl, choseOn) {
+  if (onEl) onEl.classList.toggle('active', choseOn);
+  if (offEl) offEl.classList.toggle('active', !choseOn);
+}
 const tlmOn2 = document.getElementById('tlm-on');
 const tlmOff2 = document.getElementById('tlm-off');
-if (tlmOn2) tlmOn2.addEventListener('click', () => { setTelemetry('on'); window.__telemetry = 'on'; refreshTlmStatus(); });
-if (tlmOff2) tlmOff2.addEventListener('click', () => { setTelemetry('off'); window.__telemetry = 'off'; refreshTlmStatus(); });
+if (tlmOn2) tlmOn2.addEventListener('click', () => {
+  setTelemetry('on'); window.__telemetry = 'on'; refreshTlmStatus();
+  flipTogglePair(tlmOn2, tlmOff2, true);
+});
+if (tlmOff2) tlmOff2.addEventListener('click', () => {
+  setTelemetry('off'); window.__telemetry = 'off'; refreshTlmStatus();
+  flipTogglePair(tlmOn2, tlmOff2, false);
+});
 
 const tokOn = document.getElementById('tok-on');
 const tokOff = document.getElementById('tok-off');
 function setTokens(value) { vscode.postMessage({ type: 'setTokens', value }); sfxClick(); }
-if (tokOn) tokOn.addEventListener('click', () => setTokens('on'));
-if (tokOff) tokOff.addEventListener('click', () => setTokens('off'));
+if (tokOn) tokOn.addEventListener('click', () => { setTokens('on'); flipTogglePair(tokOn, tokOff, true); });
+if (tokOff) tokOff.addEventListener('click', () => { setTokens('off'); flipTogglePair(tokOn, tokOff, false); });
 
 const bactOn = document.getElementById('bact-on');
 const bactOff = document.getElementById('bact-off');
 function setBuddyActions(value) { vscode.postMessage({ type: 'setBuddyActions', value }); sfxClick(); }
-if (bactOn) bactOn.addEventListener('click', () => setBuddyActions('on'));
-if (bactOff) bactOff.addEventListener('click', () => setBuddyActions('off'));
+if (bactOn) bactOn.addEventListener('click', () => { setBuddyActions('on'); flipTogglePair(bactOn, bactOff, true); });
+if (bactOff) bactOff.addEventListener('click', () => { setBuddyActions('off'); flipTogglePair(bactOn, bactOff, false); });
 
 // Footer external links (asWebviewUri/CSP can be picky; route through host)
 const footerRate = document.getElementById('footer-rate');
@@ -4068,6 +4442,28 @@ class SkillsViewProvider {
         this.refresh();
         for (const v of this.views) {
           v.webview.postMessage({ type: 'toast', key: msg.value === 'on' ? 'toast.buddyActionsEnabled' : 'toast.buddyActionsDisabled' });
+        }
+        // Demo fighting — when turning the feature on, immediately push
+        // a 5s `busy` → `completed` cycle so the user can see what it
+        // actually looks like. Without this, monsters only ever appear
+        // mid-task and many users assume the toggle did nothing.
+        if (msg.value === 'on') {
+          // Pick a demo active fighter — most recent command if any,
+          // else the locked class, else default to codey.
+          const demoCfg = userConfig.read();
+          const recent = tokenUsage.getMostRecentCommand && tokenUsage.getMostRecentCommand();
+          let demoActive = recent ? userConfig.classifySkill(recent) : null;
+          if (!demoActive) demoActive = (demoCfg.character && demoCfg.character.class) || 'codey';
+          setTimeout(() => {
+            for (const v of this.views) {
+              v.webview.postMessage({ type: 'buddyActivity', state: 'busy', activeClass: demoActive });
+            }
+          }, 600);
+          setTimeout(() => {
+            for (const v of this.views) {
+              v.webview.postMessage({ type: 'buddyActivity', state: 'completed', activeClass: demoActive });
+            }
+          }, 5600);
         }
       } else if (msg.type === 'runRawCommand' && typeof msg.command === 'string') {
         // Dispatched by onboarding "install superpowers" button.
@@ -4221,12 +4617,28 @@ function activate(context) {
   startBuddyActions();
   const provider = new SkillsViewProvider(context);
   // Wire activity ticks → broadcast to every webview as state changes.
+  // Active fighter resolution: most recent <command-name> from JSONL →
+  // mapped through CATEGORY_RULES → class id. Falls back to the user's
+  // currently locked class. The webview uses this to decorate exactly
+  // one buddy with .active-fighter while the rest cheer in place.
   let _lastBroadcastState = null;
+  const resolveActiveClass = () => {
+    const cmd = tokenUsage.getMostRecentCommand();
+    if (cmd) {
+      try {
+        const cls = userConfig.classifySkill(cmd);
+        if (cls) return cls;
+      } catch {}
+    }
+    const cfg = userConfig.read();
+    return (cfg.character && cfg.character.class) || null;
+  };
   _buddyActionsListeners.add((snap) => {
     if (snap.state === _lastBroadcastState && snap.state !== 'busy') return;
     _lastBroadcastState = snap.state;
+    const activeClass = resolveActiveClass();
     for (const v of provider.views) {
-      v.webview.postMessage({ type: 'buddyActivity', state: snap.state });
+      v.webview.postMessage({ type: 'buddyActivity', state: snap.state, activeClass });
     }
   });
 

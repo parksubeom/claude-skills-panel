@@ -6,34 +6,40 @@
 [![GitHub stars](https://img.shields.io/github/stars/parksubeom/claude-skills-panel?style=flat-square&color=fbbf24&logo=github)](https://github.com/parksubeom/claude-skills-panel)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-## Stop typing `/full-flow` from memory.
+## Manage your Claude Code skills like a game.
 
 > **New here?** [Claude Code](https://docs.claude.com/en/docs/claude-code) is Anthropic's AI coding CLI. It runs in your terminal (or inside Cursor / VS Code) and is driven by *slash commands* (`/commit`, `/review`, …). Once you install a plugin or two, those commands pile up fast — and that's the problem this panel solves.
 
-If you use **Claude Code** and you've installed even one plugin, you've probably got 30+ slash commands you can't remember.
-
-**This is the panel for them.** One click to fire any command. Or `1`–`6`. Or fuzzy search. Or just browse.
+A pixel-art skill launcher for Claude Code. **Click to fire, right-click to edit, watch your buddies fight while you work, see exactly which commands eat your tokens.**
 
 ![Buddy lineup — your usage pattern decides which of 10 RPG classes your buddy becomes](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
 
-**Three things you get the moment you install:**
+### The five things you actually use it for
 
-1. **A grid of every slash command on your machine.** Your `~/.claude/skills/`, your `~/.claude/commands/`, your project-level `.claude/`, and every plugin you've installed via `/plugin install` — all auto-discovered, no setup.
-2. **One-click execution.** Click a card → command goes to clipboard. Or auto-paste + Enter. Or send straight to your active terminal. Pick the mode that fits.
-3. **A built-in plugin marketplace browser.** 243+ official plugins, searchable, **one-click install**. The GUI Claude Code never had.
+1. **🎮 Manage custom skills like a game.** Every slash command on your machine becomes a card. Click to fire. **Right-click to open and edit `SKILL.md` in place.** Drag to the Quick Bar for keyboard 1–6 shortcuts. Aliases, custom icons, hidden cards, custom groups — all from a single edit modal.
 
-**And then the side-project gravity hits:**
+2. **🐾 Cute pixel buddies make work less lonely.** Above the Quick Bar lives a yard where your invoked classes idle, walk around, and *fight monsters while Claude is actually busy* (mtime polling — no prompt content read). When the task ends, they cheer with a 3-tone chime + ✓! bubble. Click any buddy to see its role and stats. (All optional — one toggle off.)
 
-- ⚔️ **A buddy that branches into 1 of 10 RPG classes** based on your slash command usage. Use a lot of `/git-*`? You become **Gitto the Ninja**. Heavy on `/code-review`? **Testra the Paladin**. Reincarnate any time.
-- 🎨 **Three pixel themes** — Dark, Retro CRT, Gameboy LCD
-- 🏆 **Skills level up** (LV.0 → LV.5), **16 achievements**, **weekly Markdown report**
-- 🌐 **Four languages** — English / 한국어 / 日本語 / 中文
+3. **📊 See which commands you actually use.** The 📊 weekly report shows a 7-day activity chart, your TOP 5 most-fired commands, and exports to Markdown. Mastery levels (LV.0 → LV.5) per skill, achievements, daily streaks — your skill belt grows visibly.
 
-**All gamification is one toggle off.** The clean professional panel is one click away.
+4. **⚡ Find token hogs instantly.** Opt-in token tracking reads only `message.usage` from Claude Code's session transcripts (never prompt text) and surfaces **per-skill totals on every card**, a `⚡ Most tokens` sort, and a "Top 5 by Tokens" report section. Now you know which command is costing you 12k tokens per use.
+
+5. **🛒 Browse 243+ official plugins inside the panel.** Search, filter, install with one click — the GUI Claude Code itself never shipped.
+
+### Where to dock it
+
+Pick the spot that fits how you run Claude Code:
+
+| You use Claude Code via… | Recommended panel location | Why |
+|---|---|---|
+| **Claude Code IDE extension** (sidebar agent) | **Bottom panel** (View → Appearance → Move Panel Position → Bottom) | Sits next to your terminal so cards + chat are visible together |
+| **Claude Code CLI** in your terminal | **Activity Bar** (left side, narrow) | Cards stay one click away while the terminal owns the main area |
+
+Both modes auto-adapt — wide layouts get the full yard, narrow ones collapse the yard into a `🐾 View buddies` button.
 
 > Stop memorizing — one click · 외워서 타이핑하지 말고 한 번에 클릭 · もう打たないで、ワンクリックで起動 · 别再死记斜杠命令,一键触发
 
-> Built mostly *with* Claude Code itself. Free, MIT, ~120 KB, no telemetry by default.
+> Built mostly *with* Claude Code itself. Free, MIT, ~200 KB, no telemetry by default.
 
 ---
 
@@ -45,6 +51,7 @@ If you use **Claude Code** and you've installed even one plugin, you've probably
 - ✅ Your `~/.claude/commands/` or `~/.claude/skills/` has 5+ custom entries
 - ✅ You moved from VS Code to Cursor / Windsurf and miss the plugin GUI
 - ✅ You'd rather hit `1`–`6` than retype `/commit-prepare` every time
+- ✅ You've ever wondered "which of my skills is burning the most tokens?"
 
 **You probably don't need this if:**
 
