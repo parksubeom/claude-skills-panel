@@ -105,11 +105,16 @@ New plugin? Just install with `/plugin install <name>@<marketplace>` and it show
 
 | Action | Result |
 |---|---|
-| Click card | Copy `/skill` to clipboard (or auto-execute) |
-| Right-click card | Open `SKILL.md` |
-| Drag to Quick Bar | Register to slot (keyboard 1–6) |
-| Hover ✎ | Edit alias / icon / note |
-| Click buddy | Open character sheet |
+| **Click card body** | Fire — copies `/skill` to clipboard, optionally pipes to active terminal |
+| **Right-click card** | Opens `SKILL.md` for editing |
+| Click ✎ on card | Edit modal — alias / note / icon / prompt template / hide / group |
+| Click 💬 on card | (terminal mode only) Edit the prompt before sending — append context, then Send |
+| Drag card → Quick Bar | Register to slot (keyboard 1–6) |
+| Click any yard buddy | Per-buddy info modal — class, role, invocation count, trigger keywords |
+| Click 🪄 character button | User character sheet (your locked class, stats, reincarnate) |
+| Click 🛒 in toolbar | Plugin marketplace browser (243+ plugins, one-click install) |
+| Click 📊 in toolbar | Weekly report (activity chart + Top 5 + tokens, exportable) |
+| Click ⚙ in toolbar | Settings (telemetry, token tracking, buddy actions, settings export/import) |
 
 ### ⚡ Quick Bar — unlocked by evolution
 
@@ -124,74 +129,100 @@ Drag your most-used skills to 6 slots and trigger them with number keys. Each sl
 
 | Mode | Behavior |
 |---|---|
-| **▶ Paste** | Copy to clipboard only (default) |
-| **▶ Auto** | Focus input + auto-paste + send Enter (mac/win/linux) |
-| **▶ Term** | Send directly to active terminal |
+| **▶ Paste** | Copy `/skill` to clipboard only (default — most reliable) |
+| **▶💬 Term** | Send `/skill` directly to the active terminal. Cards with a saved **prompt template** show a 💬 button — click it to edit the final text (e.g. `review this file /code-review`) before send |
+
+> v0.41 dropped the previous `▶ Auto` mode (osascript / SendKeys / xdotool keystroke automation) — it was unreliable against React-driven inputs in Cursor / VS Code, and `Term` mode covers the same automation use case far more reliably.
 
 ### ✏️ Customization
 
 - **Alias** — rename any skill with a shorter label
 - **Note** — shown in the hover popover
+- **Prompt template** — preset wrapper text (e.g. `"review this file"`) that prefills before send in terminal mode
 - **Custom icon** — upload your own image (PNG/SVG/JPG/GIF)
 - **Hide** — declutter skills you rarely use
+- **Custom groups** — emoji + name; drag-reorder; assign skills via the edit modal
 
-All settings saved to `~/.claude/skills-panel-config.json` — version-controllable via dotfiles.
+All settings saved to `~/.claude/skills-panel-config.json` — version-controllable via dotfiles. Settings export/import via the ⚙ panel for one-click sync to another machine.
+
+### 📊 Stats & token tracking (opt-in)
+
+- **Weekly report (📊)** — 7-day activity chart + Top 5 most-fired commands + Markdown export. See exactly which skills you actually run.
+- **Token usage** — when enabled in Settings, the panel reads only `message.usage` from `~/.claude/projects/*.jsonl` (never prompt content) and surfaces:
+  - Per-card label under the mastery stars (e.g. `12.4k tok`)
+  - Toolbar `⚡ Most tokens` sort
+  - Weekly report "Top 5 by Tokens (all-time)" section
+- **Mastery ★** — LV.0 → LV.5 per skill with level-up animation
+- **Daily streak** — 🔥 N days in the footer
+- **16 achievements** — volume / variety / streaks / mastery / customization
+
+### 🛒 Plugin marketplace browser
+
+The `🛒` button opens an in-panel browser of every plugin from every marketplace you've added (`/plugin marketplace add …`). Search by name / description / author, filter by category, toggle "installed only," and one-click install — the install command flows through your current execution mode (clipboard or terminal).
 
 ---
 
-## 🎮 Bonus: Pixel Adventure (optional)
+## 🐾 Buddy Yard — pixel companions that work alongside you
 
-> Everything below this line is opt-in eye candy. Toggle it off in Settings if you only want a clean launcher.
-
-### 🐾 Claude Skills Buddies — class-branch evolution
-
-A pixel-art companion that **branches into one of 10 RPG classes** based on your most-used slash-command category. Everyone starts the same; your usage decides who you become.
+> Everything in this section is **opt-in eye candy**. Toggle it off in Settings → Buddy actions if you only want a clean launcher. The serious launcher half above is fully self-contained.
 
 ![Buddy lineup](https://raw.githubusercontent.com/parksubeom/claude-skills-panel/main/docs/screenshots/buddy-lineup.png)
 
-| Stage | Threshold | Result |
-|---|---|---|
-| LV.1 Egg | 0 actions | common |
-| LV.2 Hatchling | 10+ | common |
-| **LV.3 [Class]** | **50+** | **branch — class is locked here from your skill usage** |
-| LV.4 [Class] Adept | 150+ | same class, stronger aura |
-| LV.5 [Class] Master | 500+ | final form |
+### Class-branch buddies
 
-| Class | Role | Triggers on slash commands containing… |
-|---|---|---|
-| **Codey** 🗡️ | Swordsman | `code`, `refactor`, `simpl`, `implement` |
-| **Docly** 📜 | Cleric | `doc`, `write`, `markdown`, `readme` |
-| **Debuggo** 🔍 | Detective | `debug`, `bug`, `fix`, `trace` |
-| **Testra** 🛡️ | Paladin | `test`, `spec`, `verify`, `check`, `review` |
-| **Sheety** 📊 | Merchant | `xlsx`, `csv`, `sheet`, `excel` |
-| **Slidey** 🎤 | Bard | `slide`, `pptx`, `present` |
-| **PDFox** 🦊 | Rogue | `pdf` |
-| **Webbie** 🕸️ | Wizard | `web`, `frontend`, `css`, `react`, `figma` |
-| **Datia** 🧙‍♀️ | Astrologer | `analyze`, `chart`, `metric`, `dashboard` |
-| **Gitto** ⚔️ | Ninja | `git`, `commit`, `branch`, `push`, `pr`, `merge` |
+A pixel-art companion that **branches into one of 10 RPG classes** based on your most-used slash-command category. From the very first slash command you fire, the buddy starts as a class — no waiting through generic stages.
+
+| Stage | Threshold (total actions) |
+|---|---|
+| LV.1 [Class] **Apprentice** | 0+ (your first action picks the class) |
+| LV.2 [Class] **Adept** | 10+ |
+| LV.3 [Class] **Skilled** | 50+ |
+| LV.4 [Class] **Master** | 150+ |
+| LV.5 [Class] **Legend** | 500+ |
+
+| Class | Role | Attack | Triggers on |
+|---|---|---|---|
+| **Codey** 🗡️ | Swordsman | ⚔ sword swing (melee) | `code`, `refactor`, `simpl`, `implement`, `build`, `compile` |
+| **Docly** 📜 | Cleric | ✨×5 divine aura | `doc`, `write`, `markdown`, `readme`, `note` |
+| **Debuggo** 🔍 | Detective | 🔍 magnifying pulse (melee) | `debug`, `bug`, `fix`, `trace`, `stacktrace`, `logs` |
+| **Testra** 🛡️ | Paladin | ⚒ hammer stamp (melee) | `test`, `spec`, `verify`, `check`, `review`, `audit` |
+| **Sheety** 📊 | Merchant | 🪙×2 coin toss (projectile) | `xlsx`, `csv`, `sheet`, `excel`, `table`, `tsv` |
+| **Slidey** 🎤 | Bard | 🎵×3 note volley (projectile) | `slide`, `pptx`, `present`, `pitch`, `keynote` |
+| **PDFox** 🦊 | Rogue | 🗡×4 dagger barrage (projectile) | `pdf` |
+| **Webbie** 🕸️ | Wizard | 🔥 fireball (projectile) | `web`, `frontend`, `ui`, `css`, `react`, `tailwind`, `figma`, `design` |
+| **Datia** 🧙‍♀️ | Astrologer | ⭐ star spell (aura) | `analyze`, `chart`, `viz`, `metric`, `dashboard`, `stats` |
+| **Gitto** ⚔️ | Ninja | ✦×3 shuriken volley (projectile) | `git`, `commit`, `branch`, `push`, `pr`, `merge`, `rebase` |
 
 Don't like your class? Hit **🔄 Reincarnate** — the locked class clears, your counts stay, and the next action picks fresh.
 
 **Stats**: 🧠 INT (brainstorm/review skills) · ⚡ DEX (Quick Bar usage) · ❤️ VIT (daily streak) · 🍀 LCK (achievements)
 
----
+### The yard above the Quick Bar
 
-### 🏆 Metagame
+Every class your buddy has ever invoked lives in a small pixel diorama above the Quick Bar. They idle, walk back and forth, react to clicks. Wide panels show it inline; narrow panels (Activity Bar) collapse the yard into a `🐾 View buddies` button that opens a modal version.
 
-- **16 achievements** — volume / variety / streaks / mastery / customization
-- **Weekly report** (`📊`) — 7-day activity chart + TOP 5 skills
-- **Mastery ★** — LV.1–5 per skill, with level-up animation and sound
-- **Daily streak** — 🔥 N days tracked in footer
+**Click any buddy** → see *that buddy's* class info (sprite, role, invocation count, trigger keywords, "★ Your current class" if it matches yours).
 
----
+**Custom backdrop** — drop an image at `assets/buddy-yard-bg.{png,jpg,jpeg,webp,gif}` and the panel auto-applies it as a `cover`-fitted background. Forest, dusk, dungeon — your call.
+
+### 🗡️ Side-scroller fights while Claude works
+
+Enable **Settings → Buddy actions** and the yard reacts to whether Claude Code is actually busy:
+
+- The panel polls `~/.claude/projects/*.jsonl` mtime every 5s (metadata only, no content read)
+- While Claude is working: a **red pixel monster** fades in on the left, the **active fighter** (the buddy whose class matches the running command) dashes from the right cluster to the monster's side and runs its class strike (sword swing / fireball / shuriken volley / …), the others cheer in place. Yellow damage numbers float up — and 18% of the time you get a pink **CRIT**.
+- When the task ends: monster fades out, every buddy plays a celebrate hop, a **✓!** bubble floats above each, a 3-tone 8-bit chime fires, and a `🎉 Task complete!` toast appears.
+
+Works with both the Claude Code CLI and the Claude Code IDE extension — both write to the same `~/.claude/projects/` tree.
 
 ### 🎨 Pixel-art UI
 
 - **Pixel fonts**: DotGothic16 (Korean) + Press Start 2P (English)
-- **30 custom spark-style icons** — one per skill category, consistent dark frame
+- **62 custom spark-style icons** — one per skill category, consistent dark frame
+- **3 themes** — Dark / Retro CRT / Gameboy LCD (toggle in toolbar)
 - **CRT effects** — scanlines + vignette (toggleable)
-- **8-bit sounds** — hover, click, level-up (toggleable)
-- **Animations** — chamfer corners, sparkle hover, shake on click, staggered card entrance
+- **8-bit sounds** — hover, click, level-up, task-complete chime (toggleable)
+- **Animations** — chamfer corners, sparkle hover, ripple on click, staggered card entrance, side-scroller combat
 
 ---
 
@@ -220,8 +251,8 @@ cd claude-skills-panel
 npm install
 
 npm run build:pixels   # pixel icon set
-npm run build:spark    # 30 spark-style skill icons
-npm run build:buddy    # 6-stage buddy character
+npm run build:spark    # 62 spark-style skill icons
+npm run build:buddy    # 10-class buddy sprites (apprentice → legend share the same art)
 npm run package        # build all + package .vsix
 
 # Manual publish (CI handles this on tagged releases)

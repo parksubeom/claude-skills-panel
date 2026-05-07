@@ -2,6 +2,40 @@
 
 All notable changes to this extension are documented here.
 
+## [0.43.1] — 2026-05-07
+
+### Changed — README brought up to date with everything that landed in v0.40-v0.43
+
+The README's interaction tables, execution-mode list, buddy stage table,
+and class table all referred to pre-v0.40 behavior:
+
+- **Interactions table**: rewritten — card body click vs ✎ button vs 💬
+  prompt-edit button (terminal mode) vs right-click `SKILL.md` vs yard
+  buddy click (per-buddy info, not the user's own character sheet) vs
+  toolbar 🛒 / 📊 / ⚙ / 🪄.
+- **Execution Modes**: removed `▶ Auto` (deleted in v0.41 — was unreliable
+  against React-driven inputs in Cursor/VS Code). Now documents `▶ Paste`
+  + `▶💬 Term`, with the prompt-template flow.
+- **Stages table**: was Egg → Hatchling → 50+ branch (pre-v0.35). Now
+  Apprentice → Adept → Skilled → Master → Legend, all class-locked from
+  the first action.
+- **Class table**: added the per-class attack action column shipped in
+  v0.43 (⚔ sword swing / ✦×3 shuriken / 🔥 fireball / etc.).
+- **Bonus → Buddy Yard section**: re-promoted from "optional eye candy"
+  to first-class feature documentation. Documents the yard staging,
+  per-buddy info modal, custom backdrop, side-scroller combat with
+  damage numbers + crits + completion chime.
+- **Pixel-art UI**: 30 → 62 spark icons; 6-stage → 10-class buddy.
+- **Customization**: added `Prompt template`, `Custom groups`, settings
+  export/import.
+- New "Stats & token tracking" subsection covers the v0.40 token-usage
+  feature surface (per-card label, sort, weekly-report Top 5).
+- New "Plugin marketplace browser" subsection covers the v0.25 feature
+  that was missing from the features list entirely.
+
+No code changes, so this is just a patch release for marketplace listing
+freshness.
+
 ## [0.43.0] — 2026-05-07
 
 A polish + game-feel sprint that turned the buddy yard from "buddies
